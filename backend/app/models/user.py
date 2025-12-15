@@ -14,7 +14,8 @@ Base = declarative_base()
 class UserPlan(str, enum.Enum):
     """사용자 플랜"""
     FREE = "free"  # 무료
-    PRO = "pro"  # 유료
+    BASIC = "basic"  # 기본 유료 (월 6,990원)
+    PRO = "pro"  # 프로 유료 (월 14,900원)
 
 
 class AIModel(str, enum.Enum):
@@ -56,8 +57,10 @@ class User(Base):
         """사용 가능한 AI 모델 목록 반환"""
         if self.plan == UserPlan.FREE:
             return [AIModel.GPT_5_NANO]
+        elif self.plan == UserPlan.BASIC:
+            return [AIModel.GPT_5_MINI]
         else:  # PRO
-            return [AIModel.GPT_5_MINI, AIModel.GPT_5, AIModel.GPT_5_2]
+            return [AIModel.GPT_5_2]
 
     def can_use_model(self, model: AIModel) -> bool:
         """특정 모델 사용 가능 여부 확인"""
