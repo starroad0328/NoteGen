@@ -7,6 +7,7 @@ from typing import Optional
 from openai import OpenAI
 from app.core.config import settings
 from app.models.note import OrganizeMethod
+from app.models.user import AIModel, UserPlan
 
 
 class AIService:
@@ -18,7 +19,8 @@ class AIService:
     async def organize_note(
         self,
         ocr_text: str,
-        method: OrganizeMethod
+        method: OrganizeMethod,
+        ai_model: AIModel = AIModel.GPT_5_NANO
     ) -> str:
         """
         필기 텍스트를 선택한 방식으로 정리
@@ -26,6 +28,7 @@ class AIService:
         Args:
             ocr_text: OCR로 추출한 텍스트
             method: 정리 방식
+            ai_model: 사용할 AI 모델 (기본: GPT-5 nano)
 
         Returns:
             정리된 노트 (마크다운 형식)
@@ -41,10 +44,19 @@ class AIService:
         else:
             raise ValueError(f"지원하지 않는 정리 방식입니다: {method}")
 
+        # 모델에 따른 max_tokens 설정
+        max_tokens_config = {
+            AIModel.GPT_5_NANO: 1000,  # 무료: 제한적
+            AIModel.GPT_5_MINI: 1500,  # Basic: 중간
+            AIModel.GPT_5: 2000,  # Pro: 충분
+            AIModel.GPT_5_2: 2500,  # Pro 최고급: 풍부
+        }
+        max_tokens = max_tokens_config.get(ai_model, 1000)
+
         # OpenAI API 호출
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model=ai_model.value,  # Enum value 사용
                 messages=[
                     {
                         "role": "system",
@@ -57,7 +69,7 @@ class AIService:
                     }
                 ],
                 temperature=0.3,  # 일관성 있는 결과를 위해 낮게 설정
-                max_tokens=2000
+                max_tokens=max_tokens
             )
 
             organized_text = response.choices[0].message.content
