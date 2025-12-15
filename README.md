@@ -26,7 +26,7 @@ NoteGen은 중·고등학생을 위한 AI 기반 자동 필기 정리 앱입니�
 
 ```
 NoteGen/
-├── backend/                 # FastAPI 백엔드
+├── backend/                 # FastAPI 백엔드 API
 │   ├── app/
 │   │   ├── main.py         # 메인 애플리케이션
 │   │   ├── api/            # API 라우터
@@ -37,19 +37,20 @@ NoteGen/
 │   ├── requirements.txt    # Python 의존성
 │   └── .env.example        # 환경 변수 템플릿
 │
-├── frontend/               # Next.js 프론트엔드
-│   ├── src/
-│   │   ├── app/            # Next.js 13+ App Router
-│   │   ├── components/     # React 컴포넌트
-│   │   ├── services/       # API 서비스
-│   │   └── types/          # TypeScript 타입
-│   ├── public/             # 정적 파일
-│   ├── package.json        # Node 의존성
-│   └── .env.example        # 환경 변수 템플릿
+├── mobile/                 # React Native 모바일 앱 (Expo)
+│   ├── app/                # 앱 화면
+│   │   ├── index.tsx       # 홈 화면
+│   │   ├── upload.tsx      # 업로드 화면
+│   │   ├── processing/     # 처리 중 화면
+│   │   └── notes/          # 노트 목록/상세
+│   ├── services/           # API 서비스
+│   ├── package.json        # 의존성
+│   └── app.json            # Expo 설정
 │
 ├── docs/                   # 프로젝트 문서
 │   ├── 개발 과정/
 │   ├── 앱 구조/
+│   ├── AI 비용과 유료 기능/
 │   ├── 교육과정 데이터 설계/
 │   ├── 필기 사진 분석&정리 구조/
 │   └── 과목별 문제 구조/
@@ -63,7 +64,8 @@ NoteGen/
 
 - **Python** 3.10 이상
 - **Node.js** 18.0 이상
-- **npm** 9.0 이상
+- **Expo CLI** (npx expo)
+- **Android Studio** 또는 **Xcode** (선택)
 
 ### 1. 저장소 클론
 
@@ -91,7 +93,7 @@ pip install -r requirements.txt
 
 # 환경 변수 설정
 cp .env.example .env
-# .env 파일을 열어 API 키 등을 설정
+# .env 파일을 열어 OpenAI API 키 등을 설정
 
 # 개발 서버 실행
 uvicorn app.main:app --reload
@@ -99,23 +101,27 @@ uvicorn app.main:app --reload
 
 백엔드 서버가 `http://localhost:8000`에서 실행됩니다.
 
-### 3. 프론트엔드 설정
+### 3. 모바일 앱 설정
 
 ```bash
-cd frontend
+cd mobile
 
 # 의존성 설치
 npm install
 
-# 환경 변수 설정
-cp .env.example .env.local
-# .env.local 파일을 열어 API URL 등을 설정
-
-# 개발 서버 실행
-npm run dev
+# Expo 개발 서버 실행
+npx expo start
 ```
 
-프론트엔드 서버가 `http://localhost:3000`에서 실행됩니다.
+QR 코드를 스캔하여 Expo Go 앱에서 실행하거나:
+- **Android**: `a` 키를 눌러 Android 에뮬레이터에서 실행
+- **iOS**: `i` 키를 눌러 iOS 시뮬레이터에서 실행
+
+**중요**: `mobile/services/api.ts`에서 `API_URL`을 실제 컴퓨터 IP로 변경하세요.
+```typescript
+// Android 에뮬레이터: http://10.0.2.2:8000
+// 실제 기기: http://[컴퓨터IP]:8000 (예: http://192.168.0.10:8000)
+```
 
 ## 🔑 환경 변수 설정
 
@@ -168,15 +174,16 @@ npm test
 ### Backend
 - **FastAPI**: 고성능 Python 웹 프레임워크
 - **SQLAlchemy**: ORM
-- **OpenAI API**: AI 텍스트 정리
+- **OpenAI API**: AI 텍스트 정리 (GPT-5 시리즈)
 - **Google Cloud Vision**: OCR 인식
 - **PostgreSQL/SQLite**: 데이터베이스
 
-### Frontend
-- **Next.js 14**: React 프레임워크
+### Mobile App
+- **React Native**: 크로스 플랫폼 모바일 프레임워크
+- **Expo**: 빠른 개발 및 배포
 - **TypeScript**: 타입 안정성
-- **Tailwind CSS**: 스타일링
-- **Zustand**: 상태 관리
+- **Expo Router**: 파일 기반 네비게이션
+- **Expo Image Picker**: 카메라 및 갤러리
 - **Axios**: HTTP 클라이언트
 
 ## 🗺️ 로드맵
