@@ -72,19 +72,27 @@ async def process_note_pipeline(note_id: int):
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] Committed to DB\n")
 
-        # 2. AI 정리 (임시로 OCR 결과만 반환)
-        # TODO: OpenAI API 키 설정 후 활성화
-        # note.status = ProcessStatus.AI_ORGANIZING
-        # db.commit()
-        # organized_content = await ai_service.organize_note(
-        #     ocr_text=ocr_text,
-        #     method=note.organize_method
-        # )
+        # 2. AI 정리
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] Starting AI processing...\n")
 
-        # 임시: OCR 결과를 그대로 반환
-        note.organized_content = f"[OCR 결과]\n\n{ocr_text}"
+        note.status = ProcessStatus.AI_ORGANIZING
+        db.commit()
+
+        organized_content = await ai_service.organize_note(
+            ocr_text=ocr_text,
+            method=note.organize_method
+        )
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] AI result length: {len(organized_content) if organized_content else 0}\n")
+
+        note.organized_content = organized_content
         note.status = ProcessStatus.COMPLETED
         db.commit()
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] AI processing completed\n")
 
     except Exception as e:
         note.status = ProcessStatus.FAILED

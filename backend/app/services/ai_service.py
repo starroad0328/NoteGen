@@ -46,33 +46,43 @@ class AIService:
 
         # 모델에 따른 max_tokens 설정
         max_tokens_config = {
-            AIModel.GPT_5_NANO: 1000,  # 무료: 제한적
+            AIModel.GPT_5_NANO: 2000,  # 무료: nano는 생각 토큰 많이 씀 (최소 2000)
             AIModel.GPT_5_MINI: 1500,  # Basic: 중간
-            AIModel.GPT_5: 2000,  # Pro: 충분
-            AIModel.GPT_5_2: 2500,  # Pro 최고급: 풍부
+            AIModel.GPT_5: 2000,       # Pro: 충분
+            AIModel.GPT_5_2: 2500,     # Pro 최고급: 풍부
         }
-        max_tokens = max_tokens_config.get(ai_model, 1000)
+        max_tokens = max_tokens_config.get(ai_model, 2000)  # 기본값 2000
 
         # OpenAI API 호출
         try:
+            # nano용 간소화된 시스템 프롬프트
+            system_prompt = "필기를 정리해주세요." if ai_model == AIModel.GPT_5_NANO else \
+                           "당신은 학생들의 필기를 깔끔하게 정리해주는 AI 어시스턴트입니다. " \
+                           "주어진 텍스트를 읽기 쉽고 이해하기 쉽게 구조화하세요."
+
             response = self.client.chat.completions.create(
-                model=ai_model.value,  # Enum value 사용
+                model=ai_model.value,
                 messages=[
                     {
                         "role": "system",
-                        "content": "당신은 학생들의 필기를 깔끔하게 정리해주는 AI 어시스턴트입니다. "
-                                   "주어진 텍스트를 읽기 쉽고 이해하기 쉽게 구조화하세요."
+                        "content": system_prompt
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                temperature=0.3,  # 일관성 있는 결과를 위해 낮게 설정
-                max_tokens=max_tokens
+                max_completion_tokens=max_tokens
             )
 
             organized_text = response.choices[0].message.content
+
+            # 빈 응답 처리
+            if not organized_text or not organized_text.strip():
+                if response.choices[0].finish_reason == "length":
+                    raise Exception("토큰 한도 초과: max_completion_tokens를 늘려야 합니다.")
+                else:
+                    raise Exception(f"AI가 빈 응답을 반환했습니다. (finish_reason: {response.choices[0].finish_reason})")
 
             return organized_text.strip()
 
@@ -80,68 +90,17 @@ class AIService:
             raise Exception(f"AI 정리 중 오류 발생: {str(e)}")
 
     def _get_basic_summary_prompt(self, ocr_text: str) -> str:
-        """기본 요약 정리 프롬프트"""
-        return f"""
-다음 필기 내용을 '기본 요약 정리' 형식으로 정리해주세요.
+        """기본 요약 정리 프롬프트 (nano용 간소화)"""
+        return f"""제목과 글머리표로 정리:
 
-[정리 규칙]
-1. 제목을 자동으로 생성하세요 (내용을 기반으로)
-2. 소제목으로 내용을 구분하세요
-3. 각 소제목 아래에 글머리표(•)를 사용하여 요약하세요
-4. 중요한 개념은 ⭐ 표시를 추가하세요
-5. 강조할 내용은 🔸 표시를 추가하세요
-6. 마크다운 형식으로 작성하세요
-
-[출력 형식]
-# [제목]
-
-## [소제목 1]
-• 요약 내용 1
-• ⭐ 중요 개념
-• 요약 내용 2
-
-## [소제목 2]
-• 🔸 강조 내용
-• 요약 내용
-
-[필기 원문]
 {ocr_text}
-
-위 내용을 기본 요약 정리 형식으로 정리해주세요:
 """
 
     def _get_cornell_prompt(self, ocr_text: str) -> str:
-        """코넬식 정리 프롬프트"""
-        return f"""
-다음 필기 내용을 '코넬식 노트' 형식으로 정리해주세요.
+        """코넬식 정리 프롬프트 (nano용 간소화)"""
+        return f"""키워드와 설명을 표로 정리하고 요약:
 
-[정리 규칙]
-1. 제목을 자동으로 생성하세요
-2. 좌측 키워드: 핵심 개념을 질문형으로 ("~란?", "~의 특징은?")
-3. 우측 본문: 개념을 명확하게 설명
-4. 하단 요약: 전체 내용을 1문장으로 압축
-5. 중요한 개념은 ⭐ 표시
-6. 마크다운 형식으로 작성하세요
-
-[출력 형식]
-# [제목]
-
-## 📝 노트 내용
-
-| 키워드/질문 | 설명 |
-|------------|------|
-| ⭐ [핵심 개념]이란? | [명확한 설명] |
-| [관련 개념]의 특징은? | [특징 설명] |
-
----
-
-**📌 요약**
-[전체 내용을 1문장으로 압축한 요약]
-
-[필기 원문]
 {ocr_text}
-
-위 내용을 코넬식 노트 형식으로 정리해주세요:
 """
 
 
