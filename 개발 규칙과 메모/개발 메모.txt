@@ -2,14 +2,14 @@
                     NoteGen 개발 메모
 ═══════════════════════════════════════════════════════════════
 
-최종 업데이트: 2025년 12월 15일
+최종 업데이트: 2025년 12월 17일
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  현재 상태
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-진행도: 90%
+진행도: 95%
 
 완료된 작업:
   ✅ 프로젝트 기획 및 문서화
@@ -17,11 +17,14 @@
   ✅ Mobile App UI 구현 (React Native + Expo)
   ✅ AI 모델 가격 정책 수립
   ✅ 데이터베이스 모델 설계
+  ✅ CLOVA OCR API 통합 (네이버 클라우드)
+  ✅ OCR bbox + confidence 메타데이터 저장
+  ✅ Expo SDK 54 업그레이드
+  ✅ 백엔드-모바일 연동 테스트
 
 대기 중인 작업:
-  ⏳ API 키 설정 (OpenAI, Google Cloud Vision)
-  ⏳ 실제 실행 테스트
-  ⏳ OCR 정확도 테스트
+  ⏳ OpenAI API 키 설정 (AI 정리 기능 활성화)
+  ⏳ Vision AI 통합 (이미지 + OCR + bbox 활용)
   ⏳ AI 정리 품질 테스트
 
 
@@ -30,14 +33,15 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 필수:
-  □ OpenAI API Key 발급
-    → https://platform.openai.com/api-keys
+  ✅ CLOVA OCR API 설정 완료
+    → Secret Key, Invoke URL 설정됨
 
-  □ backend/.env 파일에 API 키 입력
-    → OPENAI_API_KEY=발급받은키
+  □ OpenAI API Key 발급 (AI 정리 기능용)
+    → https://platform.openai.com/api-keys
+    → backend/.env에 OPENAI_API_KEY 입력 필요
 
 선택:
-  □ Google Cloud Vision API (더 나은 OCR)
+  □ Google Cloud Vision API (이중 OCR용)
   □ Android Studio (에뮬레이터 테스트)
 
 
@@ -62,13 +66,54 @@ Mobile App 실행:
  알려진 이슈
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. requirements.txt에서 OCR 패키지 임시 제외
-   - Pillow, pytesseract 빌드 오류
-   - 필요 시 수동 설치
+1. CLOVA OCR 사용 중
+   - Google Vision, Tesseract는 미사용
+   - 한글 손글씨 인식에 CLOVA가 최적
 
-2. psycopg2 제거됨
-   - MVP는 SQLite 사용
-   - 추후 PostgreSQL 전환 시 재추가
+2. OCR 메타데이터 저장
+   - bbox, confidence 정상 저장됨 (JSON 형식)
+   - 이중 JSON 인코딩 이슈 해결됨
+
+3. Expo SDK 54 사용
+   - expo-linking 추가 설치 필요
+   - React Native 0.81.5, React 19.1.0
+
+4. Windows 인코딩 이슈
+   - emoji 제거로 해결
+   - cp949 codec 에러 방지
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 최근 개발 내역 (2025-12-17)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CLOVA OCR API 통합
+  - 네이버 클라우드 API Gateway 연동
+  - Secret Key, Invoke URL 설정
+  - 한글 손글씨 인식 테스트 성공
+
+✅ OCR 메타데이터 저장 구조 구현
+  - bbox (좌표) 저장: 각 글자/단어의 위치 정보
+  - confidence (신뢰도) 저장
+  - DB에 ocr_metadata JSON 컬럼 추가
+  - 향후 Vision AI 통합 및 오버레이 UX 준비
+
+✅ 백엔드 개선
+  - httpx, pydantic-settings 패키지 추가
+  - config.py에 CLOVA OCR 설정 추가
+  - BackgroundTasks DB 세션 처리 개선
+  - Windows cp949 인코딩 이슈 해결
+
+✅ 모바일 앱 업데이트
+  - Expo SDK 54 업그레이드 (50 → 54)
+  - expo-linking 추가
+  - React Native FormData 이미지 업로드 수정
+  - 동적 IP 연결 지원 (192.168.55.96:8000)
+
+✅ 테스트 완료
+  - CLOVA OCR 텍스트 추출 성공
+  - bbox 메타데이터 저장 검증 (158개 블록 추출)
+  - 모바일-백엔드 연동 정상
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -77,7 +122,8 @@ Mobile App 실행:
 
 저장소: https://github.com/starroad0328/NoteGen
 브랜치: main
-최신 커밋: ce00937 (refactor: 웹에서 모바일 앱으로 전환)
+최신 커밋: 4784825 (chore: .gitignore 업데이트)
+이전 커밋: 9380b4d (feat: CLOVA OCR 통합 및 bbox 메타데이터 저장)
 
 
 ═══════════════════════════════════════════════════════════════
