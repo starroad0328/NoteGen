@@ -45,6 +45,11 @@ yarn.lock
 out/
 .vercel
 
+# Expo
+.expo/
+*.png
+!assets/*.png
+
 # Database
 *.db
 *.sqlite
