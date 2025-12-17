@@ -6,9 +6,7 @@
 import axios from 'axios'
 
 // 개발 환경에서는 localhost를 실제 IP로 변경 필요
-// Android 에뮬레이터: 10.0.2.2
-// iOS 시뮬레이터: localhost
-const API_URL = 'http://localhost:8000'  // 실제 서버 IP로 변경
+const API_URL = 'http://192.168.55.96:8000'
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -36,15 +34,26 @@ export interface ProcessResponse {
   error_message?: string
 }
 
+// React Native 이미지 타입
+interface ImageFile {
+  uri: string
+  type: string
+  name: string
+}
+
 /**
  * 필기 업로드 API
  */
 export const uploadAPI = {
-  uploadImages: async (files: File[], organizeMethod: string) => {
+  uploadImages: async (images: ImageFile[], organizeMethod: string) => {
     const formData = new FormData()
 
-    files.forEach((file) => {
-      formData.append('files', file as any)
+    images.forEach((image) => {
+      formData.append('files', {
+        uri: image.uri,
+        type: image.type,
+        name: image.name,
+      } as any)
     })
     formData.append('organize_method', organizeMethod)
 

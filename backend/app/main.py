@@ -25,7 +25,7 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,18 +80,18 @@ app.include_router(
 async def startup_event():
     """애플리케이션 시작 시 실행"""
     print("=" * 50)
-    print("🚀 NoteGen API Server Starting...")
-    print(f"📝 Version: {settings.APP_VERSION}")
-    print(f"🔧 Debug Mode: {settings.DEBUG}")
-    print(f"📁 Upload Directory: {settings.UPLOAD_DIR}")
-    print(f"🌐 API Docs: http://localhost:8000/docs")
+    print("[START] NoteGen API Server Starting...")
+    print(f"[INFO] Version: {settings.APP_VERSION}")
+    print(f"[INFO] Debug Mode: {settings.DEBUG}")
+    print(f"[INFO] Upload Directory: {settings.UPLOAD_DIR}")
+    print(f"[INFO] API Docs: http://localhost:8000/docs")
     print("=" * 50)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """애플리케이션 종료 시 실행"""
-    print("👋 NoteGen API Server Shutting Down...")
+    print("[STOP] NoteGen API Server Shutting Down...")
 
 
 if __name__ == "__main__":

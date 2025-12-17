@@ -5,6 +5,7 @@ Note Processing Pipeline API
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
+import json
 
 from app.core.database import get_db
 from app.models.note import Note, ProcessStatus
@@ -15,42 +16,73 @@ from app.services.ai_service import ai_service
 router = APIRouter()
 
 
-async def process_note_pipeline(note_id: int, db: Session):
+async def process_note_pipeline(note_id: int):
     """
     노트 처리 파이프라인
     1. OCR 처리
     2. AI 정리
     3. 결과 저장
     """
-    note = db.query(Note).filter(Note.id == note_id).first()
-
-    if not note:
-        return
+    # 백그라운드 태스크용 새 DB 세션
+    from app.core.database import SessionLocal
+    db = SessionLocal()
 
     try:
+        note = db.query(Note).filter(Note.id == note_id).first()
+
+        if not note:
+            db.close()
+            return
         # 1. OCR 처리
         note.status = ProcessStatus.OCR_PROCESSING
         db.commit()
 
         image_paths = note.image_paths.split(",")
-        ocr_text = await ocr_service.extract_text_from_images(image_paths)
+
+        # OCR 실행
+        with open('./debug.log', 'a') as f:
+            f.write(f"\n[{note_id}] Starting OCR...\n")
+
+        ocr_result = await ocr_service.extract_text_from_images(image_paths)
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] OCR result type: {type(ocr_result)}\n")
+            f.write(f"[{note_id}] OCR result: {isinstance(ocr_result, tuple)}\n")
+
+        ocr_text, ocr_metadata = ocr_result
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] Text length: {len(ocr_text) if ocr_text else 0}\n")
+            f.write(f"[{note_id}] Metadata not None: {ocr_metadata is not None}\n")
+            f.write(f"[{note_id}] Metadata type: {type(ocr_metadata)}\n")
 
         if not ocr_text or not ocr_text.strip():
             raise Exception("이미지에서 텍스트를 추출할 수 없습니다.")
 
         note.ocr_text = ocr_text
+        metadata_json = json.dumps(ocr_metadata) if ocr_metadata else None
+        note.ocr_metadata = metadata_json
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] Metadata JSON length: {len(metadata_json) if metadata_json else 0}\n")
+            f.write(f"[{note_id}] note.ocr_metadata set: {note.ocr_metadata is not None}\n")
+
         db.commit()
 
-        # 2. AI 정리
-        note.status = ProcessStatus.AI_ORGANIZING
-        db.commit()
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] Committed to DB\n")
 
-        organized_content = await ai_service.organize_note(
-            ocr_text=ocr_text,
-            method=note.organize_method
-        )
+        # 2. AI 정리 (임시로 OCR 결과만 반환)
+        # TODO: OpenAI API 키 설정 후 활성화
+        # note.status = ProcessStatus.AI_ORGANIZING
+        # db.commit()
+        # organized_content = await ai_service.organize_note(
+        #     ocr_text=ocr_text,
+        #     method=note.organize_method
+        # )
 
-        note.organized_content = organized_content
+        # 임시: OCR 결과를 그대로 반환
+        note.organized_content = f"[OCR 결과]\n\n{ocr_text}"
         note.status = ProcessStatus.COMPLETED
         db.commit()
 
@@ -58,6 +90,10 @@ async def process_note_pipeline(note_id: int, db: Session):
         note.status = ProcessStatus.FAILED
         note.error_message = str(e)
         db.commit()
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] ERROR: {str(e)}\n")
+    finally:
+        db.close()
 
 
 @router.post("/{note_id}/process", response_model=ProcessResponse)
@@ -67,7 +103,7 @@ async def process_note(
     db: Session = Depends(get_db)
 ):
     """
-    노트 처리 시작 (비동기)
+    노트 처리 시작 (동기 - 디버깅용)
 
     업로드된 노트를 OCR + AI 정리 파이프라인으로 처리합니다.
     """
@@ -82,13 +118,17 @@ async def process_note(
             detail=f"현재 노트 상태에서는 처리할 수 없습니다. 상태: {note.status}"
         )
 
-    # 백그라운드에서 처리
-    background_tasks.add_task(process_note_pipeline, note_id, db)
+    # 임시: 동기 처리 (에러 확인용)
+    await process_note_pipeline(note_id)
+
+    # 처리 후 상태 다시 조회
+    db.refresh(note)
 
     return ProcessResponse(
         note_id=note.id,
-        status=ProcessStatus.OCR_PROCESSING,
-        message="노트 처리가 시작되었습니다. 완료까지 잠시 기다려주세요."
+        status=note.status,
+        message="노트 처리가 완료되었습니다." if note.status == ProcessStatus.COMPLETED else "처리 중...",
+        organized_content=note.organized_content if note.status == ProcessStatus.COMPLETED else None
     )
 
 

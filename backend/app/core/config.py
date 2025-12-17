@@ -4,7 +4,8 @@ Application Configuration
 """
 
 from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic import field_validator
+from typing import Optional, Set, List
 import os
 
 
@@ -20,7 +21,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./notegen.db"
 
     # API Keys
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
 
     # Google Cloud
@@ -31,21 +32,34 @@ class Settings(BaseSettings):
     AZURE_VISION_KEY: Optional[str] = None
     AZURE_VISION_ENDPOINT: Optional[str] = None
 
+    # CLOVA OCR (Naver Cloud)
+    CLOVA_OCR_SECRET_KEY: Optional[str] = None
+    CLOVA_OCR_INVOKE_URL: Optional[str] = None
+
     # File Upload
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
-    ALLOWED_EXTENSIONS: set = {"jpg", "jpeg", "png"}
+    ALLOWED_EXTENSIONS: str = "jpg,jpeg,png"
     MAX_FILES_PER_UPLOAD: int = 3
 
     # CORS
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:3001"]
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
 
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
 
+    @property
+    def allowed_extensions_set(self) -> Set[str]:
+        return set(self.ALLOWED_EXTENSIONS.split(","))
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        return self.CORS_ORIGINS.split(",")
+
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 # 설정 인스턴스 생성

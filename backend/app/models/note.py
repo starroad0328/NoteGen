@@ -3,7 +3,7 @@ Note Database Model
 노트 데이터베이스 모델
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
@@ -43,6 +43,7 @@ class Note(Base):
 
     # OCR 결과
     ocr_text = Column(Text, nullable=True)
+    ocr_metadata = Column(JSON, nullable=True)  # bbox, confidence 등 메타데이터
 
     # 정리 방식
     organize_method = Column(
