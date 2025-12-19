@@ -3,7 +3,7 @@ File Upload API
 파일 업로드 엔드포인트
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -55,12 +55,13 @@ def save_upload_file(file: UploadFile) -> str:
 
 @router.post("/", response_model=NoteResponse)
 async def upload_images(
+    background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(..., description="이미지 파일 (최대 3개)"),
     organize_method: OrganizeMethod = Form(default=OrganizeMethod.BASIC_SUMMARY),
     db: Session = Depends(get_db)
 ):
     """
-    필기 이미지 업로드
+    필기 이미지 업로드 및 자동 처리 시작
 
     - **files**: 이미지 파일 리스트 (JPG, PNG)
     - **organize_method**: 정리 방식 (basic_summary 또는 cornell)
@@ -98,6 +99,10 @@ async def upload_images(
     db.add(note)
     db.commit()
     db.refresh(note)
+
+    # 자동으로 처리 시작 (백그라운드)
+    from app.api.process import process_note_pipeline
+    background_tasks.add_task(process_note_pipeline, note.id)
 
     return note
 

@@ -72,8 +72,20 @@ export const uploadAPI = {
  */
 export const processAPI = {
   startProcess: async (noteId: number): Promise<ProcessResponse> => {
-    const response = await apiClient.post(`/api/process/${noteId}/process`)
-    return response.data
+    console.log('[processAPI] 시작, noteId:', noteId)
+    console.log('[processAPI] URL:', `${API_URL}/api/process/${noteId}/process`)
+    try {
+      const response = await apiClient.post(`/api/process/${noteId}/process`)
+      console.log('[processAPI] 응답:', response.data)
+      return response.data
+    } catch (error: any) {
+      console.error('[processAPI] axios message:', error?.message)
+      console.error('[processAPI] axios code:', error?.code)
+      console.error('[processAPI] axios config url:', error?.config?.baseURL, error?.config?.url)
+      console.error('[processAPI] axios response:', error?.response?.status, error?.response?.data)
+      console.error('[processAPI] axios request:', error?.request ? '요청은 갔음' : '요청 안 감')
+      throw error
+    }
   },
 
   getStatus: async (noteId: number): Promise<ProcessResponse> => {
