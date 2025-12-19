@@ -79,10 +79,18 @@ async def process_note_pipeline(note_id: int):
         note.status = ProcessStatus.AI_ORGANIZING
         db.commit()
 
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] [PROCESS] organize_note 호출 직전\n")
+            f.write(f"[{note_id}] [PROCESS] ocr_metadata type: {type(ocr_metadata)}\n")
+
         organized_content = await ai_service.organize_note(
             ocr_text=ocr_text,
-            method=note.organize_method
+            method=note.organize_method,
+            ocr_metadata=ocr_metadata
         )
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[{note_id}] [PROCESS] organize_note 호출 완료\n")
 
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] AI result length: {len(organized_content) if organized_content else 0}\n")

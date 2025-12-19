@@ -108,9 +108,17 @@ class OCRService:
 
             result = response.json()
 
-            # 텍스트 + bbox 추출
+            # 이미지 크기 추출 (정규화용)
+            image_width = 1000
+            image_height = 1000
+            for image_result in result.get("images", []):
+                if "convertedImageInfo" in image_result:
+                    image_width = image_result["convertedImageInfo"].get("width", 1000)
+                    image_height = image_result["convertedImageInfo"].get("height", 1000)
+
+            # 텍스트 + bbox 추출 (원본 - 글자/단어 단위)
             extracted_texts = []
-            ocr_blocks = []
+            ocr_words = []
 
             for image_result in result.get("images", []):
                 for field in image_result.get("fields", []):
@@ -121,22 +129,37 @@ class OCRService:
                     # 텍스트
                     extracted_texts.append(infer_text)
 
-                    # bbox + confidence + 메타데이터
+                    # bbox + confidence
                     vertices = field.get("boundingPoly", {}).get("vertices", [])
-                    bbox = [[int(v.get("x", 0)), int(v.get("y", 0))] for v in vertices] if vertices else None
+                    if vertices:
+                        # 4점 좌표에서 x, y, w, h 계산
+                        xs = [int(v.get("x", 0)) for v in vertices]
+                        ys = [int(v.get("y", 0)) for v in vertices]
+                        x, y = min(xs), min(ys)
+                        w, h = max(xs) - x, max(ys) - y
 
-                    ocr_blocks.append({
-                        "text": infer_text,
-                        "bbox": bbox,
-                        "confidence": field.get("inferConfidence", 0.0),
-                        "source": "clova"
-                    })
+                        # y 중심값 (줄 판정용)
+                        cy = y + h // 2
+
+                        ocr_words.append({
+                            "text": infer_text,
+                            "x": x, "y": y, "w": w, "h": h,
+                            "cy": cy,
+                            "confidence": field.get("inferConfidence", 0.0)
+                        })
+
+            # 줄/블록으로 압축
+            lines = self._merge_words_to_lines(ocr_words)
+            blocks = self._merge_lines_to_blocks(lines, image_width, image_height)
 
             # 메타데이터 구조
             metadata = {
                 "image_path": image_path,
-                "blocks": ocr_blocks,
-                "total_blocks": len(ocr_blocks)
+                "image_size": {"w": image_width, "h": image_height},
+                "words": ocr_words,  # 원본 (UI용)
+                "blocks": blocks,     # 압축 (LLM용)
+                "total_words": len(ocr_words),
+                "total_blocks": len(blocks)
             }
 
             text_result = " ".join(extracted_texts) if extracted_texts else None
@@ -144,6 +167,171 @@ class OCRService:
 
         except Exception as e:
             raise Exception(f"CLOVA OCR 처리 중 오류 발생: {str(e)}")
+
+    def _merge_words_to_lines(self, words: List[Dict]) -> List[Dict]:
+        """
+        글자/단어 bbox → 줄(Line)로 합치기
+
+        - y 중심값(cy) 기준으로 같은 줄 판정
+        - 같은 줄은 x 기준 정렬 후 텍스트 이어붙임
+        """
+        if not words:
+            return []
+
+        # cy 기준 정렬
+        sorted_words = sorted(words, key=lambda w: (w["cy"], w["x"]))
+
+        lines = []
+        current_line = [sorted_words[0]]
+
+        for word in sorted_words[1:]:
+            last_word = current_line[-1]
+
+            # 평균 높이 계산
+            avg_height = sum(w["h"] for w in current_line) / len(current_line)
+
+            # 같은 줄 판정: cy 차이가 높이의 60% 이내
+            if abs(word["cy"] - last_word["cy"]) < avg_height * 0.6:
+                current_line.append(word)
+            else:
+                # 새 줄 시작
+                lines.append(self._create_line_from_words(current_line))
+                current_line = [word]
+
+        # 마지막 줄 추가
+        if current_line:
+            lines.append(self._create_line_from_words(current_line))
+
+        return lines
+
+    def _create_line_from_words(self, words: List[Dict]) -> Dict:
+        """단어들을 하나의 줄로 합침"""
+        # x 기준 정렬
+        sorted_words = sorted(words, key=lambda w: w["x"])
+
+        # 텍스트 이어붙이기
+        text = " ".join(w["text"] for w in sorted_words)
+
+        # bbox: 포함하는 최소 사각형
+        min_x = min(w["x"] for w in sorted_words)
+        min_y = min(w["y"] for w in sorted_words)
+        max_x = max(w["x"] + w["w"] for w in sorted_words)
+        max_y = max(w["y"] + w["h"] for w in sorted_words)
+
+        # 평균 confidence
+        avg_conf = sum(w["confidence"] for w in sorted_words) / len(sorted_words)
+
+        return {
+            "text": text,
+            "x": min_x, "y": min_y,
+            "w": max_x - min_x, "h": max_y - min_y,
+            "cy": (min_y + max_y) // 2,
+            "confidence": avg_conf,
+            "word_count": len(sorted_words)
+        }
+
+    def _merge_lines_to_blocks(
+        self,
+        lines: List[Dict],
+        image_width: int,
+        image_height: int
+    ) -> List[Dict]:
+        """
+        줄(Line) → 블록(Block)으로 합치기
+
+        - 연속 줄 사이 간격이 작으면 같은 블록
+        - 들여쓰기(x 시작점)가 비슷하면 같은 블록
+        - 좌표는 0~1000 정규화
+        """
+        if not lines:
+            return []
+
+        # y 기준 정렬
+        sorted_lines = sorted(lines, key=lambda l: l["y"])
+
+        blocks = []
+        current_block = [sorted_lines[0]]
+
+        for line in sorted_lines[1:]:
+            last_line = current_block[-1]
+
+            # 줄 간격 계산
+            line_gap = line["y"] - (last_line["y"] + last_line["h"])
+            avg_height = sum(l["h"] for l in current_block) / len(current_block)
+
+            # x 시작점 차이
+            x_diff = abs(line["x"] - last_line["x"])
+
+            # 같은 블록 판정:
+            # - 줄 간격이 평균 높이의 1.5배 이내
+            # - x 시작점 차이가 50px 이내
+            if line_gap < avg_height * 1.5 and x_diff < 50:
+                current_block.append(line)
+            else:
+                # 새 블록 시작
+                blocks.append(self._create_block_from_lines(
+                    current_block, len(blocks), image_width, image_height
+                ))
+                current_block = [line]
+
+        # 마지막 블록 추가
+        if current_block:
+            blocks.append(self._create_block_from_lines(
+                current_block, len(blocks), image_width, image_height
+            ))
+
+        return blocks
+
+    def _create_block_from_lines(
+        self,
+        lines: List[Dict],
+        block_idx: int,
+        image_width: int,
+        image_height: int
+    ) -> Dict:
+        """줄들을 하나의 블록으로 합치고 좌표 정규화"""
+        # 텍스트 합치기 (줄바꿈으로 구분)
+        text = "\n".join(l["text"] for l in lines)
+
+        # bbox: 포함하는 최소 사각형
+        min_x = min(l["x"] for l in lines)
+        min_y = min(l["y"] for l in lines)
+        max_x = max(l["x"] + l["w"] for l in lines)
+        max_y = max(l["y"] + l["h"] for l in lines)
+
+        # 0~1000 정규화 (정수)
+        norm_x = int(min_x * 1000 / image_width)
+        norm_y = int(min_y * 1000 / image_height)
+        norm_w = int((max_x - min_x) * 1000 / image_width)
+        norm_h = int((max_y - min_y) * 1000 / image_height)
+
+        # 평균 confidence
+        avg_conf = sum(l["confidence"] for l in lines) / len(lines)
+
+        return {
+            "id": f"b{block_idx}",
+            "bbox": [norm_x, norm_y, norm_w, norm_h],
+            "text": text,
+            "confidence": round(avg_conf, 3),
+            "line_count": len(lines)
+        }
+
+    def get_blocks_for_llm(self, metadata: Dict) -> Dict:
+        """
+        LLM 전달용 압축 데이터 반환
+
+        Returns:
+            {"page": {"w": 1000, "h": 1000}, "blocks": [...]}
+        """
+        blocks = []
+
+        for image_meta in metadata.get("images", []):
+            blocks.extend(image_meta.get("blocks", []))
+
+        return {
+            "page": {"w": 1000, "h": 1000},
+            "blocks": blocks
+        }
 
     async def _extract_with_google_vision(self, image_path: str) -> Optional[str]:
         """Google Cloud Vision API로 텍스트 추출"""

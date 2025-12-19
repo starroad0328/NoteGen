@@ -20,8 +20,7 @@ class UserPlan(str, enum.Enum):
 
 class AIModel(str, enum.Enum):
     """AI 모델"""
-    GPT_5_NANO = "gpt-5-nano"  # 무료 사용자 전용
-    GPT_5_MINI = "gpt-5-mini"  # 유료 Basic 기본값
+    GPT_5_MINI = "gpt-5-mini-2025-08-07"  # 무료 & Basic 기본값
     GPT_5 = "gpt-5"  # 유료 Pro 옵션 1
     GPT_5_2 = "gpt-5.2"  # 유료 Pro 옵션 2 (최고급)
 
@@ -41,10 +40,10 @@ class User(Base):
     # 플랜 정보
     plan = Column(Enum(UserPlan), default=UserPlan.FREE)
 
-    # 유료 사용자 AI 모델 선택
+    # 사용자 AI 모델 선택
     preferred_ai_model = Column(
         Enum(AIModel),
-        default=AIModel.GPT_5_NANO
+        default=AIModel.GPT_5_MINI
     )
 
     # 활성 상태
@@ -56,11 +55,11 @@ class User(Base):
     def get_allowed_models(self):
         """사용 가능한 AI 모델 목록 반환"""
         if self.plan == UserPlan.FREE:
-            return [AIModel.GPT_5_NANO]
+            return [AIModel.GPT_5_MINI]  # 무료도 GPT-5 mini 사용
         elif self.plan == UserPlan.BASIC:
             return [AIModel.GPT_5_MINI]
         else:  # PRO
-            return [AIModel.GPT_5_2]
+            return [AIModel.GPT_5, AIModel.GPT_5_2]  # Pro는 선택 가능
 
     def can_use_model(self, model: AIModel) -> bool:
         """특정 모델 사용 가능 여부 확인"""
