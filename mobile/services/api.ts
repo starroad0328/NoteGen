@@ -5,8 +5,9 @@
 
 import axios from 'axios'
 
-// 개발 환경에서는 localhost를 실제 IP로 변경 필요
-const API_URL = 'http://192.168.55.96:8000'
+// 개발 환경: LAN IP로 통일
+const DEV_API_URL = 'http://192.168.55.96:8000'
+const API_URL = DEV_API_URL
 
 const apiClient = axios.create({
   baseURL: API_URL,
