@@ -27,6 +27,21 @@ export interface Note {
   error_message?: string
 }
 
+export interface User {
+  id: number
+  email: string
+  name?: string
+  school_level?: string
+  grade?: number
+  grade_display: string
+  plan: string
+}
+
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+}
+
 export interface ProcessResponse {
   note_id: number
   status: string
@@ -46,7 +61,7 @@ interface ImageFile {
  * 필기 업로드 API
  */
 export const uploadAPI = {
-  uploadImages: async (images: ImageFile[], organizeMethod: string) => {
+  uploadImages: async (images: ImageFile[], organizeMethod: string, token?: string | null) => {
     const formData = new FormData()
 
     images.forEach((image) => {
@@ -58,10 +73,17 @@ export const uploadAPI = {
     })
     formData.append('organize_method', organizeMethod)
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'multipart/form-data',
+    }
+
+    // 로그인한 경우 토큰 추가
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
     const response = await apiClient.post('/api/upload/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers,
     })
 
     return response.data
@@ -113,6 +135,53 @@ export const notesAPI = {
 
   delete: async (noteId: number): Promise<void> => {
     await apiClient.delete(`/api/notes/${noteId}`)
+  },
+}
+
+/**
+ * 인증 API
+ */
+export const authAPI = {
+  register: async (
+    email: string,
+    password: string,
+    name?: string,
+    schoolLevel?: string,
+    grade?: number
+  ): Promise<AuthResponse> => {
+    const response = await apiClient.post('/api/auth/register', {
+      email,
+      password,
+      name,
+      school_level: schoolLevel,
+      grade,
+    })
+    return response.data
+  },
+
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    const response = await apiClient.post('/api/auth/login', {
+      email,
+      password,
+    })
+    return response.data
+  },
+
+  getMe: async (token: string): Promise<User> => {
+    const response = await apiClient.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  updateMe: async (
+    token: string,
+    data: { name?: string; school_level?: string; grade?: number }
+  ): Promise<User> => {
+    const response = await apiClient.put('/api/auth/me', data, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
   },
 }
 

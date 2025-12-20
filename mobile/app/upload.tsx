@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { uploadAPI, processAPI } from '../services/api'
+import { uploadAPI } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function UploadScreen() {
   const router = useRouter()
+  const { user, token } = useAuth()
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
   const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell'>('basic_summary')
   const [uploading, setUploading] = useState(false)
@@ -33,15 +35,14 @@ export default function UploadScreen() {
     if (images.length === 0) { Alert.alert('알림', '이미지를 선택해주세요.'); return }
     setUploading(true)
     try {
-      console.log('[DEBUG] 업로드 시작')
+      console.log('[DEBUG] 업로드 시작', user ? `(사용자: ${user.grade_display || user.email})` : '(비로그인)')
       const imageData = images.map((image, index) => ({ uri: image.uri, type: 'image/jpeg', name: 'image_' + index + '.jpg' }))
 
       console.log('[DEBUG] uploadAPI 호출')
-      const uploadResult = await uploadAPI.uploadImages(imageData, organizeMethod)
+      const uploadResult = await uploadAPI.uploadImages(imageData, organizeMethod, token)
       console.log('[DEBUG] uploadResult:', uploadResult)
 
       console.log('[DEBUG] processing 페이지로 이동, ID:', uploadResult.id)
-      // processAPI.startProcess() 호출 제거 - 백엔드에서 자동 처리
       router.push('/processing/' + uploadResult.id)
     } catch (error: any) {
       console.error('[DEBUG] 에러 발생:', error)
@@ -56,6 +57,11 @@ export default function UploadScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>뒤로</Text></TouchableOpacity>
         <Text style={styles.title}>필기 업로드</Text>
         <Text style={styles.subtitle}>손으로 쓴 필기를 업로드하고 정리 방식을 선택하세요</Text>
+        {user?.grade_display && (
+          <View style={styles.gradeInfo}>
+            <Text style={styles.gradeInfoText}>{user.grade_display} 교육과정에 맞춰 정리됩니다</Text>
+          </View>
+        )}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>이미지 선택</Text>
           <View style={styles.imageButtons}>
@@ -82,7 +88,9 @@ const styles = StyleSheet.create({
   backButton: { marginTop: 40, marginBottom: 20 },
   backText: { color: '#3B82F6', fontSize: 16 },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
+  subtitle: { fontSize: 14, color: '#666', marginBottom: 12 },
+  gradeInfo: { backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 16 },
+  gradeInfoText: { color: 'white', fontSize: 13, fontWeight: '500' },
   section: { backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
   imageButtons: { flexDirection: 'row', gap: 12 },

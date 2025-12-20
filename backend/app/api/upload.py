@@ -5,7 +5,7 @@ File Upload API
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import os
 import uuid
 from datetime import datetime
@@ -13,7 +13,9 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.note import Note, OrganizeMethod, ProcessStatus
+from app.models.user import User
 from app.schemas.note import NoteResponse
+from app.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -58,13 +60,15 @@ async def upload_images(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(..., description="이미지 파일 (최대 3개)"),
     organize_method: OrganizeMethod = Form(default=OrganizeMethod.BASIC_SUMMARY),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """
     필기 이미지 업로드 및 자동 처리 시작
 
     - **files**: 이미지 파일 리스트 (JPG, PNG)
     - **organize_method**: 정리 방식 (basic_summary 또는 cornell)
+    - 로그인 시 사용자 학년에 맞는 교육과정 기반 보충 설명 제공
     """
 
     # 파일 개수 확인
@@ -88,12 +92,13 @@ async def upload_images(
                 os.remove(path)
         raise e
 
-    # 노트 생성
+    # 노트 생성 (로그인 사용자면 user_id 저장)
     note = Note(
         title=f"필기 {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         image_paths=",".join(saved_paths),  # 쉼표로 구분하여 저장
         organize_method=organize_method,
-        status=ProcessStatus.UPLOADING
+        status=ProcessStatus.UPLOADING,
+        user_id=current_user.id if current_user else None
     )
 
     db.add(note)

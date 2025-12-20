@@ -1,14 +1,15 @@
 """
 AI Organization Service
-AI 기반 노트 정리 서비스 (2단계 처리 + 블록 압축)
+AI 기반 노트 정리 서비스 (3단계 처리 + 블록 압축 + 교육과정 반영)
 """
 
 import json
 from typing import Optional, Dict, List
 from openai import OpenAI
 from app.core.config import settings
+from app.core.curriculum import get_curriculum_context, detect_subject
 from app.models.note import OrganizeMethod
-from app.models.user import AIModel, UserPlan
+from app.models.user import AIModel, UserPlan, SchoolLevel
 
 
 class AIService:
@@ -23,19 +24,25 @@ class AIService:
         method: OrganizeMethod,
         ocr_metadata: Optional[Dict] = None,
         ai_model: AIModel = AIModel.GPT_5_MINI,
-        on_step: Optional[callable] = None
+        on_step: Optional[callable] = None,
+        school_level: Optional[SchoolLevel] = None,
+        grade: Optional[int] = None
     ) -> str:
         """
-        필기 텍스트를 2단계로 정리
+        필기 텍스트를 3단계로 정리
 
+        0단계: OCR 정제 (띄어쓰기, 오타)
         1단계: 구조 파악 (목차, 주제 분류)
-        2단계: 원본 유지 + 보강 정리
+        2단계: 원본 유지 + 보강 정리 (교육과정 반영)
 
         Args:
             ocr_text: OCR로 추출한 텍스트
             method: 정리 방식
             ocr_metadata: OCR 메타데이터 (압축 블록 포함)
             ai_model: 사용할 AI 모델
+            on_step: 단계별 콜백 함수
+            school_level: 학교급 (중/고)
+            grade: 학년 (1, 2, 3)
 
         Returns:
             정리된 노트 (마크다운 형식)
@@ -65,13 +72,18 @@ class AIService:
 
             print(f"[AI] 1단계 완료. 구조 길이: {len(structure)}", flush=True)
 
-            # 2단계: 원본 유지 + 보강 정리
+            # 2단계: 원본 유지 + 보강 정리 (교육과정 반영)
             print("[AI] 2단계 시작...", flush=True)
             if on_step:
                 await on_step(2, "AI 정리 생성 중...")
 
+            # 교육과정 컨텍스트 생성
+            curriculum_context = get_curriculum_context(school_level, grade)
+            if curriculum_context:
+                print(f"[AI] 교육과정 컨텍스트 적용: {school_level.value if school_level else ''} {grade}학년", flush=True)
+
             organized = await self._step2_organize_with_structure(
-                blocks_data, refined_text, structure, method, ai_model
+                blocks_data, refined_text, structure, method, ai_model, curriculum_context
             )
 
             print(f"[AI] 2단계 완료. 결과 길이: {len(organized)}", flush=True)
@@ -226,12 +238,14 @@ class AIService:
         ocr_text: str,
         structure: str,
         method: OrganizeMethod,
-        ai_model: AIModel
+        ai_model: AIModel,
+        curriculum_context: str = ""
     ) -> str:
         """
         2단계: 원본 유지 + 보강 정리 (핵심)
         - 원본 필기 내용은 삭제/요약 금지
         - 빠진 설명만 [보강]으로 추가
+        - 교육과정에 맞는 설명 제공
         """
         # 블록 데이터 사용 (토큰 절약)
         if blocks_data:
@@ -266,6 +280,13 @@ class AIService:
         else:
             format_instruction = "글머리표로 정리"
 
+        # 교육과정 컨텍스트 추가
+        curriculum_section = ""
+        if curriculum_context:
+            curriculum_section = f"""
+{curriculum_context}
+"""
+
         prompt = f"""필기를 정리해주세요.
 
 [필수 규칙]
@@ -273,7 +294,7 @@ class AIService:
 - [bX], (y:XX) 같은 형식 절대 출력 금지
 - 깔끔한 마크다운으로만 출력
 - 원본 내용 기반으로 정리
-
+{curriculum_section}
 [구조 참고]
 {structure}
 

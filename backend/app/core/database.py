@@ -6,7 +6,9 @@ Database Connection
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.core.config import settings
-from app.models.note import Base
+from app.models.base import Base
+# Import models to register them with Base
+from app.models import note, user
 
 # 데이터베이스 엔진 생성
 engine = create_engine(

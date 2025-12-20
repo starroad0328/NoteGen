@@ -1,11 +1,41 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function HomeScreen() {
   const router = useRouter()
+  const { user, loading, logout } = useAuth()
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.logo}>📝</Text>
+        <Text style={styles.title}>NoteGen</Text>
+        <Text style={styles.subtitle}>로딩 중...</Text>
+      </View>
+    )
+  }
 
   return (
     <View style={styles.container}>
+      {/* 사용자 정보 / 로그인 버튼 */}
+      <View style={styles.userSection}>
+        {user ? (
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>
+              {user.grade_display || user.name || user.email}
+            </Text>
+            <TouchableOpacity onPress={logout}>
+              <Text style={styles.logoutText}>로그아웃</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => router.push('/login')}>
+            <Text style={styles.loginText}>로그인</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* 로고 */}
       <Text style={styles.logo}>📝</Text>
       <Text style={styles.title}>NoteGen</Text>
@@ -14,6 +44,15 @@ export default function HomeScreen() {
       <Text style={styles.subtitle}>
         AI가 필기를 자동으로 정리해드립니다
       </Text>
+
+      {/* 학년 정보 표시 */}
+      {user?.grade_display && (
+        <View style={styles.gradeBadge}>
+          <Text style={styles.gradeBadgeText}>
+            {user.grade_display} 교육과정 맞춤 정리
+          </Text>
+        </View>
+      )}
 
       {/* 설명 */}
       <Text style={styles.description}>
@@ -57,7 +96,7 @@ export default function HomeScreen() {
       </View>
 
       {/* 버전 */}
-      <Text style={styles.version}>v1.0.0-MVP | Free Version</Text>
+      <Text style={styles.version}>v1.0.0-MVP | {user ? user.plan : 'Free'} Version</Text>
     </View>
   )
 }
@@ -69,6 +108,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  userSection: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  userName: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  logoutText: {
+    fontSize: 14,
+    color: '#3B82F6',
+  },
+  loginText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  gradeBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  gradeBadgeText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   logo: {
     fontSize: 80,

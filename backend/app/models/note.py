@@ -4,11 +4,10 @@ Note Database Model
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.models.base import Base
 
 
 class OrganizeMethod(str, enum.Enum):
@@ -32,6 +31,9 @@ class Note(Base):
     __tablename__ = "notes"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    # 사용자 연결 (선택적 - 비로그인 사용자도 가능)
+    user_id = Column(Integer, nullable=True, index=True)
 
     # 기본 정보
     title = Column(String(255), nullable=False)

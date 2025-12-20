@@ -9,6 +9,7 @@ import json
 
 from app.core.database import get_db
 from app.models.note import Note, ProcessStatus
+from app.models.user import User
 from app.schemas.note import ProcessResponse
 from app.services.ocr_service import ocr_service
 from app.services.ai_service import ai_service
@@ -79,6 +80,18 @@ async def process_note_pipeline(note_id: int):
         note.status = ProcessStatus.AI_ORGANIZING
         db.commit()
 
+        # 사용자 학년 정보 조회
+        user = None
+        school_level = None
+        grade = None
+        if note.user_id:
+            user = db.query(User).filter(User.id == note.user_id).first()
+            if user:
+                school_level = user.school_level
+                grade = user.grade
+                with open('./debug.log', 'a') as f:
+                    f.write(f"[{note_id}] User grade info: {user.grade_display}\n")
+
         # AI 단계 진행 콜백
         async def on_ai_step(step: int, message: str):
             note.progress_message = f"[{step+1}/3] {message}"
@@ -93,7 +106,9 @@ async def process_note_pipeline(note_id: int):
             ocr_text=ocr_text,
             method=note.organize_method,
             ocr_metadata=ocr_metadata,
-            on_step=on_ai_step
+            on_step=on_ai_step,
+            school_level=school_level,
+            grade=grade
         )
 
         with open('./debug.log', 'a') as f:

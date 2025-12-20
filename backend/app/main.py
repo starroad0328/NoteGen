@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api import upload, process, notes
+from app.api import upload, process, notes, auth
 
 # 데이터베이스 초기화
 init_db()
@@ -73,6 +73,11 @@ app.include_router(
     notes.router,
     prefix="/api/notes",
     tags=["Notes"]
+)
+
+app.include_router(
+    auth.router,
+    tags=["Auth"]
 )
 
 

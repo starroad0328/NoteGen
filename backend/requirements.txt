@@ -7,3 +7,5 @@ openai
 pydantic
 pydantic-settings
 httpx
+passlib[bcrypt]
+python-jose[cryptography]
