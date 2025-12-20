@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from app.core.config import settings
 from app.models.base import Base
 # Import models to register them with Base
-from app.models import note, user
+from app.models import note, user, curriculum
 
 # 데이터베이스 엔진 생성
 engine = create_engine(
@@ -32,3 +32,8 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_db_session():
+    """직접 세션 반환 (startup 등에서 사용)"""
+    return SessionLocal()

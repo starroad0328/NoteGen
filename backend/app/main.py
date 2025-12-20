@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.database import init_db
-from app.api import upload, process, notes, auth
+from app.core.database import init_db, get_db_session
+from app.core.seed_curriculum import seed_curriculum
+from app.api import upload, process, notes, auth, curriculum
 
 # 데이터베이스 초기화
 init_db()
@@ -80,6 +81,11 @@ app.include_router(
     tags=["Auth"]
 )
 
+app.include_router(
+    curriculum.router,
+    tags=["Curriculum"]
+)
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -91,6 +97,14 @@ async def startup_event():
     print(f"[INFO] Upload Directory: {settings.UPLOAD_DIR}")
     print(f"[INFO] API Docs: http://localhost:8000/docs")
     print("=" * 50)
+
+    # 교육과정 데이터 초기화
+    try:
+        db = get_db_session()
+        seed_curriculum(db)
+        db.close()
+    except Exception as e:
+        print(f"[WARN] Curriculum seed failed: {e}")
 
 
 @app.on_event("shutdown")
