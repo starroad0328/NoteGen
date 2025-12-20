@@ -63,5 +63,8 @@ class Note(Base):
     # 에러 정보
     error_message = Column(Text, nullable=True)
 
+    # 진행 상태 메시지 (AI 단계 표시용)
+    progress_message = Column(String(100), nullable=True)
+
     def __repr__(self):
         return f"<Note(id={self.id}, title='{self.title}', status='{self.status}')>"

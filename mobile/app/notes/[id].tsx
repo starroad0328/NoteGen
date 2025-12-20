@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import Markdown from 'react-native-markdown-display'
+import * as Clipboard from 'expo-clipboard'
 import { notesAPI, Note } from '../../services/api'
 
 export default function NoteScreen() {
@@ -25,6 +26,13 @@ export default function NoteScreen() {
       Alert.alert('오류', '노트를 불러올 수 없습니다.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCopy = async () => {
+    if (note?.organized_content) {
+      await Clipboard.setStringAsync(note.organized_content)
+      Alert.alert('복사 완료', '정리된 내용이 클립보드에 복사되었습니다.')
     }
   }
 
@@ -81,9 +89,14 @@ export default function NoteScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {note.title}
         </Text>
-        <TouchableOpacity onPress={handleDelete}>
-          <Text style={styles.deleteText}>🗑️</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={handleCopy} style={styles.headerButton}>
+            <Text style={styles.buttonIcon}>📋</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
+            <Text style={styles.buttonIcon}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 노트 내용 */}
@@ -152,7 +165,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginHorizontal: 16,
   },
-  deleteText: {
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  headerButton: {
+    padding: 4,
+  },
+  buttonIcon: {
     fontSize: 20,
   },
   content: {

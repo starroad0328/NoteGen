@@ -20,6 +20,7 @@ class UserPlan(str, enum.Enum):
 
 class AIModel(str, enum.Enum):
     """AI 모델"""
+    GPT_5_NANO = "gpt-5-nano-2025-08-07"  # OCR 정제용 (가장 저렴)
     GPT_5_MINI = "gpt-5-mini-2025-08-07"  # 무료 & Basic 기본값
     GPT_5 = "gpt-5"  # 유료 Pro 옵션 1
     GPT_5_2 = "gpt-5.2"  # 유료 Pro 옵션 2 (최고급)

@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { processAPI } from '../../services/api'
 
 const MAX_RETRIES = 5
-const BASE_DELAY = 2000
+const BASE_DELAY = 800  // 0.8초로 줄임
 
 export default function ProcessingScreen() {
   const router = useRouter()

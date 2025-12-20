@@ -22,7 +22,8 @@ class AIService:
         ocr_text: str,
         method: OrganizeMethod,
         ocr_metadata: Optional[Dict] = None,
-        ai_model: AIModel = AIModel.GPT_5_MINI
+        ai_model: AIModel = AIModel.GPT_5_MINI,
+        on_step: Optional[callable] = None
     ) -> str:
         """
         필기 텍스트를 2단계로 정리
@@ -46,18 +47,31 @@ class AIService:
         blocks_data = self._get_blocks_for_llm(ocr_metadata) if ocr_metadata else None
 
         try:
+            # 0단계: OCR 정제 (렌즈급 텍스트 복원) - 항상 nano 사용
+            print("[AI] 0단계: OCR 정제 시작...", flush=True)
+            if on_step:
+                await on_step(0, "OCR 텍스트 정제 중...")
+
+            refined_text = await self._step0_refine_ocr(ocr_text, AIModel.GPT_5_NANO)
+
+            print(f"[AI] 0단계 완료. 정제 텍스트 길이: {len(refined_text)}", flush=True)
+
             # 1단계: 구조 파악
             print("[AI] 1단계 시작...", flush=True)
+            if on_step:
+                await on_step(1, "필기 구조 분석 중...")
 
-            structure = await self._step1_analyze_structure(blocks_data, ocr_text, ai_model)
+            structure = await self._step1_analyze_structure(blocks_data, refined_text, ai_model)
 
             print(f"[AI] 1단계 완료. 구조 길이: {len(structure)}", flush=True)
 
             # 2단계: 원본 유지 + 보강 정리
             print("[AI] 2단계 시작...", flush=True)
+            if on_step:
+                await on_step(2, "AI 정리 생성 중...")
 
             organized = await self._step2_organize_with_structure(
-                blocks_data, ocr_text, structure, method, ai_model
+                blocks_data, refined_text, structure, method, ai_model
             )
 
             print(f"[AI] 2단계 완료. 결과 길이: {len(organized)}", flush=True)
@@ -84,6 +98,55 @@ class AIService:
             "page": {"w": 1000, "h": 1000},
             "blocks": blocks
         }
+
+    async def _step0_refine_ocr(
+        self,
+        ocr_text: str,
+        ai_model: AIModel
+    ) -> str:
+        """
+        0단계: OCR 결과 정제 (렌즈급 텍스트 복원)
+        - 띄어쓰기 복원
+        - 잘린 글자/단어 합치기
+        - 오타 교정 (문맥상 명백한 것만)
+        - 요약/설명 추가 금지
+        """
+        prompt = f"""다음 OCR 결과를 자연스러운 텍스트로 정제해줘.
+
+[규칙]
+- 원본 내용 그대로 유지
+- 띄어쓰기만 자연스럽게 복원
+- 잘린 글자/단어 합치기
+- 명백한 오타만 교정
+- 요약/설명 추가 절대 금지
+- 순서 변경 금지
+- 없는 내용 추가 금지
+
+[OCR 결과]
+{ocr_text}
+
+[정제된 텍스트]"""
+
+        response = self.client.chat.completions.create(
+            model=ai_model.value,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "OCR 텍스트 정제만. 내용 추가/요약 금지."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_completion_tokens=3000
+        )
+
+        result = response.choices[0].message.content
+        if not result or not result.strip():
+            # 정제 실패시 원본 반환
+            return ocr_text
+        return result.strip()
 
     def _format_blocks_for_prompt(self, blocks_data: Dict) -> str:
         """블록 데이터를 프롬프트용 문자열로 변환"""
@@ -183,12 +246,12 @@ class AIService:
             format_instruction = """[출력 형식]
 # 제목
 
-## 섹션1
-- 원본 내용 그대로
-- [보강] 추가 설명
+## 소제목1
+- 핵심 내용
+- 세부 내용
 
-## 섹션2
-- 원본 내용 그대로
+## 소제목2
+- 핵심 내용
 """
         elif method == OrganizeMethod.CORNELL:
             format_instruction = """[출력 형식]
@@ -196,27 +259,27 @@ class AIService:
 
 | 키워드 | 설명 |
 |--------|------|
-| 개념 | 원본 내용 |
-| [보강] | 추가 설명 |
+| 개념 | 설명 |
 
 **요약**: 1문장
 """
         else:
             format_instruction = "글머리표로 정리"
 
-        prompt = f"""필기를 정리해주세요. (블록 {block_count}개)
+        prompt = f"""필기를 정리해주세요.
 
 [필수 규칙]
-- 원본 내용 삭제/요약 금지
-- 추가 설명은 [보강]으로 표시
-- 섹션당 최대 8개 bullet
+- 블록ID, 좌표 등 메타데이터는 출력에서 완전히 제거
+- [bX], (y:XX) 같은 형식 절대 출력 금지
+- 깔끔한 마크다운으로만 출력
+- 원본 내용 기반으로 정리
 
-[구조]
+[구조 참고]
 {structure}
 
 {format_instruction}
 
-[필기 블록]
+[필기 내용]
 {content}
 """
 
@@ -225,7 +288,7 @@ class AIService:
             messages=[
                 {
                     "role": "system",
-                    "content": "학생 필기 정리. 원본 삭제 금지."
+                    "content": "학생 필기 정리. 메타데이터([bX], y좌표) 절대 출력 금지. 깔끔한 마크다운만."
                 },
                 {
                     "role": "user",

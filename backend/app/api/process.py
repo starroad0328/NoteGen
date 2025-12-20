@@ -79,6 +79,12 @@ async def process_note_pipeline(note_id: int):
         note.status = ProcessStatus.AI_ORGANIZING
         db.commit()
 
+        # AI 단계 진행 콜백
+        async def on_ai_step(step: int, message: str):
+            note.progress_message = f"[{step+1}/3] {message}"
+            db.commit()
+            print(f"[{note_id}] AI Step {step}: {message}", flush=True)
+
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] [PROCESS] organize_note 호출 직전\n")
             f.write(f"[{note_id}] [PROCESS] ocr_metadata type: {type(ocr_metadata)}\n")
@@ -86,7 +92,8 @@ async def process_note_pipeline(note_id: int):
         organized_content = await ai_service.organize_note(
             ocr_text=ocr_text,
             method=note.organize_method,
-            ocr_metadata=ocr_metadata
+            ocr_metadata=ocr_metadata,
+            on_step=on_ai_step
         )
 
         with open('./debug.log', 'a') as f:
@@ -159,18 +166,23 @@ async def get_process_status(
     if not note:
         raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
 
-    status_messages = {
-        ProcessStatus.UPLOADING: "업로드 완료",
-        ProcessStatus.OCR_PROCESSING: "OCR 처리 중...",
-        ProcessStatus.AI_ORGANIZING: "AI 정리 중...",
-        ProcessStatus.COMPLETED: "처리 완료!",
-        ProcessStatus.FAILED: f"처리 실패: {note.error_message}"
-    }
+    # AI 단계 진행 중이면 progress_message 사용
+    if note.status == ProcessStatus.AI_ORGANIZING and note.progress_message:
+        message = note.progress_message
+    else:
+        status_messages = {
+            ProcessStatus.UPLOADING: "업로드 완료",
+            ProcessStatus.OCR_PROCESSING: "OCR 처리 중...",
+            ProcessStatus.AI_ORGANIZING: "AI 정리 중...",
+            ProcessStatus.COMPLETED: "처리 완료!",
+            ProcessStatus.FAILED: f"처리 실패: {note.error_message}"
+        }
+        message = status_messages.get(note.status, "알 수 없는 상태")
 
     return ProcessResponse(
         note_id=note.id,
         status=note.status,
-        message=status_messages.get(note.status, "알 수 없는 상태"),
+        message=message,
         organized_content=note.organized_content if note.status == ProcessStatus.COMPLETED else None,
         error_message=note.error_message if note.status == ProcessStatus.FAILED else None
     )
