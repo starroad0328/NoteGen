@@ -1,9 +1,88 @@
-import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { useEffect, useState, useRef } from 'react'
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Animated,
+  Dimensions
+} from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import Markdown from 'react-native-markdown-display'
 import * as Clipboard from 'expo-clipboard'
 import { notesAPI, Note } from '../../services/api'
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
+
+// 섹션 타입별 스타일
+const SECTION_STYLES: Record<string, { color: string; icon: string }> = {
+  '핵심': { color: '#EF4444', icon: '🔑' },
+  '요약': { color: '#F59E0B', icon: '📌' },
+  '개념': { color: '#3B82F6', icon: '💡' },
+  '정의': { color: '#3B82F6', icon: '📖' },
+  '설명': { color: '#10B981', icon: '📝' },
+  '예시': { color: '#8B5CF6', icon: '✏️' },
+  '공식': { color: '#EC4899', icon: '📐' },
+  '시험': { color: '#F97316', icon: '🎯' },
+  '포인트': { color: '#F97316', icon: '🎯' },
+  '주의': { color: '#EF4444', icon: '⚠️' },
+  'default': { color: '#6B7280', icon: '📄' },
+}
+
+function getSectionStyle(title: string) {
+  for (const [keyword, style] of Object.entries(SECTION_STYLES)) {
+    if (keyword !== 'default' && title.includes(keyword)) {
+      return style
+    }
+  }
+  return SECTION_STYLES['default']
+}
+
+// 마크다운을 섹션별로 파싱
+function parseMarkdownSections(content: string) {
+  const lines = content.split('\n')
+  const sections: { title: string; content: string; level: number; startLine: number }[] = []
+
+  let currentSection: { title: string; content: string; level: number; startLine: number } | null = null
+  let headerContent = ''
+  let lineNumber = 0
+
+  for (const line of lines) {
+    const h1Match = line.match(/^# (.+)$/)
+    const h2Match = line.match(/^## (.+)$/)
+
+    if (h1Match) {
+      if (currentSection) sections.push(currentSection)
+      else if (headerContent.trim()) {
+        sections.push({ title: '개요', content: headerContent.trim(), level: 0, startLine: 0 })
+      }
+      currentSection = { title: h1Match[1], content: '', level: 1, startLine: lineNumber }
+    } else if (h2Match) {
+      if (currentSection) sections.push(currentSection)
+      else if (headerContent.trim()) {
+        sections.push({ title: '개요', content: headerContent.trim(), level: 0, startLine: 0 })
+      }
+      currentSection = { title: h2Match[1], content: '', level: 2, startLine: lineNumber }
+    } else {
+      if (currentSection) {
+        currentSection.content += line + '\n'
+      } else {
+        headerContent += line + '\n'
+      }
+    }
+    lineNumber++
+  }
+
+  if (currentSection) sections.push(currentSection)
+  else if (headerContent.trim()) {
+    sections.push({ title: '개요', content: headerContent.trim(), level: 0, startLine: 0 })
+  }
+
+  return sections
+}
 
 export default function NoteScreen() {
   const router = useRouter()
@@ -12,10 +91,48 @@ export default function NoteScreen() {
 
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sections, setSections] = useState<{ title: string; content: string; level: number; startLine: number }[]>([])
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current
+  const contentScrollRef = useRef<ScrollView>(null)
+  const sectionRefs = useRef<Record<number, number>>({})
+
+  const openDrawer = () => {
+    setDrawerOpen(true)
+    Animated.spring(drawerAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start()
+  }
+
+  const closeDrawer = () => {
+    Animated.spring(drawerAnim, {
+      toValue: -DRAWER_WIDTH,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start(() => setDrawerOpen(false))
+  }
+
+  const scrollToSection = (index: number) => {
+    const yOffset = sectionRefs.current[index] || 0
+    contentScrollRef.current?.scrollTo({ y: yOffset, animated: true })
+    closeDrawer()
+  }
 
   useEffect(() => {
     fetchNote()
   }, [])
+
+  useEffect(() => {
+    if (note?.organized_content) {
+      const parsed = parseMarkdownSections(note.organized_content)
+      setSections(parsed)
+    }
+  }, [note])
 
   const fetchNote = async () => {
     try {
@@ -48,7 +165,7 @@ export default function NoteScreen() {
           onPress: async () => {
             try {
               await notesAPI.delete(noteId)
-              router.replace('/notes')
+              router.replace('/(tabs)/notes')
             } catch (error) {
               Alert.alert('오류', '삭제 중 오류가 발생했습니다.')
             }
@@ -90,6 +207,9 @@ export default function NoteScreen() {
           {note.title}
         </Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={openDrawer} style={styles.headerButton}>
+            <Text style={styles.buttonIcon}>☰</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleCopy} style={styles.headerButton}>
             <Text style={styles.buttonIcon}>📋</Text>
           </TouchableOpacity>
@@ -99,27 +219,42 @@ export default function NoteScreen() {
         </View>
       </View>
 
-      {/* 노트 내용 */}
-      <ScrollView style={styles.content}>
-        <View style={styles.notePage}>
-          {note.organized_content ? (
-            <Markdown
-              style={{
-                body: styles.markdown,
-                heading1: styles.h1,
-                heading2: styles.h2,
-                listItem: styles.listItem,
-                table: styles.table,
-                tableHeader: styles.tableHeader,
-                tableRow: styles.tableRow,
+      {/* 목차 힌트 */}
+      <TouchableOpacity style={styles.swipeHint} onPress={openDrawer}>
+        <Text style={styles.swipeHintText}>☰ 탭해서 목차 보기</Text>
+      </TouchableOpacity>
+
+      {/* 메인 콘텐츠 */}
+      <ScrollView
+        ref={contentScrollRef}
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {sections.map((section, index) => {
+          const style = getSectionStyle(section.title)
+          return (
+            <View
+              key={index}
+              style={styles.section}
+              onLayout={(e) => {
+                sectionRefs.current[index] = e.nativeEvent.layout.y
               }}
             >
-              {note.organized_content}
-            </Markdown>
-          ) : (
-            <Text style={styles.emptyText}>정리된 내용이 없습니다.</Text>
-          )}
-        </View>
+              <View style={[styles.sectionHeader, { borderLeftColor: style.color }]}>
+                <Text style={styles.sectionIcon}>{style.icon}</Text>
+                <Text style={[styles.sectionTitle, { color: style.color }]}>
+                  {section.title}
+                </Text>
+              </View>
+              <View style={styles.sectionContent}>
+                <Markdown style={markdownStyles}>
+                  {section.content.trim()}
+                </Markdown>
+              </View>
+            </View>
+          )
+        })}
 
         {/* 노트 정보 */}
         <View style={styles.info}>
@@ -129,18 +264,124 @@ export default function NoteScreen() {
           <Text style={styles.infoText}>정리 방식: {note.organize_method}</Text>
         </View>
       </ScrollView>
+
+      {/* 드로어 오버레이 */}
+      {drawerOpen && (
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={closeDrawer}
+        />
+      )}
+
+      {/* 드로어 (목차) */}
+      <Animated.View
+        style={[
+          styles.drawer,
+          { transform: [{ translateX: drawerAnim }] }
+        ]}
+      >
+        <View style={styles.drawerHeader}>
+          <Text style={styles.drawerTitle}>📑 목차</Text>
+          <TouchableOpacity onPress={closeDrawer}>
+            <Text style={styles.closeButton}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.drawerContent}>
+          {sections.map((section, index) => {
+            const style = getSectionStyle(section.title)
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[styles.drawerItem, { borderLeftColor: style.color }]}
+                onPress={() => scrollToSection(index)}
+              >
+                <Text style={styles.drawerIcon}>{style.icon}</Text>
+                <Text style={styles.drawerItemText} numberOfLines={2}>
+                  {section.title}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      </Animated.View>
     </View>
   )
 }
 
+const markdownStyles = StyleSheet.create({
+  body: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#374151',
+  },
+  heading3: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+    color: '#1F2937',
+  },
+  bullet_list: {
+    marginVertical: 8,
+  },
+  ordered_list: {
+    marginVertical: 8,
+  },
+  list_item: {
+    marginVertical: 4,
+  },
+  strong: {
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  em: {
+    fontStyle: 'italic',
+  },
+  code_inline: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontFamily: 'monospace',
+    fontSize: 14,
+  },
+  fence: {
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 8,
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    marginVertical: 12,
+    overflow: 'hidden',
+  },
+  thead: {
+    backgroundColor: '#F9FAFB',
+  },
+  th: {
+    padding: 10,
+    fontWeight: '600',
+  },
+  td: {
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+})
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
+    backgroundColor: '#FAFAF8',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
+    backgroundColor: '#FAFAF8',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -163,77 +404,140 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: '600',
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+    color: '#1F2937',
   },
   headerButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   headerButton: {
-    padding: 4,
+    padding: 6,
   },
   buttonIcon: {
-    fontSize: 20,
+    fontSize: 18,
+  },
+  swipeHint: {
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E7FF',
+  },
+  swipeHintText: {
+    color: '#4F46E5',
+    fontSize: 13,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
   },
-  notePage: {
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  section: {
     backgroundColor: 'white',
-    margin: 16,
-    padding: 24,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  markdown: {
-    fontSize: 16,
-    lineHeight: 28,
-    color: '#2C2C2C',
-  },
-  h1: {
-    fontSize: 28,
-    fontWeight: 'bold',
     marginBottom: 16,
-    color: '#2C2C2C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
   },
-  h2: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 12,
-    color: '#2C2C2C',
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderLeftWidth: 4,
+    backgroundColor: '#FAFAFA',
   },
-  listItem: {
-    marginVertical: 4,
-    fontSize: 16,
-    lineHeight: 24,
+  sectionIcon: {
+    fontSize: 18,
+    marginRight: 10,
   },
-  table: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    marginVertical: 16,
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    flex: 1,
   },
-  tableHeader: {
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-  },
-  tableRow: {
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+  sectionContent: {
+    padding: 16,
   },
   info: {
     padding: 16,
     alignItems: 'center',
+    marginTop: 8,
   },
   infoText: {
     fontSize: 12,
-    color: '#888',
+    color: '#9CA3AF',
     marginBottom: 4,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    zIndex: 10,
+  },
+  drawer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: DRAWER_WIDTH,
+    backgroundColor: 'white',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingTop: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+  },
+  drawerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  closeButton: {
+    fontSize: 20,
+    color: '#6B7280',
+    padding: 4,
+  },
+  drawerContent: {
+    flex: 1,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderLeftWidth: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  drawerIcon: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  drawerItemText: {
+    fontSize: 15,
+    color: '#374151',
+    flex: 1,
   },
   emoji: {
     fontSize: 80,
@@ -247,12 +551,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     marginBottom: 24,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    marginVertical: 40,
   },
   button: {
     backgroundColor: '#3B82F6',

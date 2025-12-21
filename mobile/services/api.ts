@@ -9,6 +9,9 @@ import axios from 'axios'
 const DEV_API_URL = 'http://192.168.55.96:8000'
 const API_URL = DEV_API_URL
 
+// 외부에서 사용할 수 있도록 export
+export const API_BASE_URL = API_URL
+
 const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 30000,
@@ -25,6 +28,8 @@ export interface Note {
   status: string
   organized_content?: string
   error_message?: string
+  thumbnail_url?: string
+  image_urls?: string[]  // 원본 이미지 URL 목록
 }
 
 export interface User {
@@ -121,9 +126,14 @@ export const processAPI = {
  * 노트 관리 API
  */
 export const notesAPI = {
-  list: async (skip: number = 0, limit: number = 20): Promise<Note[]> => {
+  list: async (skip: number = 0, limit: number = 20, token?: string | null): Promise<Note[]> => {
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
     const response = await apiClient.get('/api/notes/', {
       params: { skip, limit },
+      headers,
     })
     return response.data
   },
@@ -133,8 +143,12 @@ export const notesAPI = {
     return response.data
   },
 
-  delete: async (noteId: number): Promise<void> => {
-    await apiClient.delete(`/api/notes/${noteId}`)
+  delete: async (noteId: number, token?: string | null): Promise<void> => {
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    await apiClient.delete(`/api/notes/${noteId}`, { headers })
   },
 }
 

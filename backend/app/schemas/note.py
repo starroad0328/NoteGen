@@ -26,6 +26,7 @@ class NoteResponse(BaseModel):
     status: ProcessStatus
     organized_content: Optional[str] = None
     error_message: Optional[str] = None
+    image_urls: Optional[List[str]] = None  # 원본 이미지 URL 목록
 
     class Config:
         from_attributes = True
@@ -37,6 +38,7 @@ class NoteListResponse(BaseModel):
     title: str
     created_at: datetime
     status: ProcessStatus
+    thumbnail_url: Optional[str] = None
 
     class Config:
         from_attributes = True
