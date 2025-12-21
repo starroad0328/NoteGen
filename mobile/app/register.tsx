@@ -120,6 +120,7 @@ export default function RegisterScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
             />
           </View>
 
@@ -131,6 +132,7 @@ export default function RegisterScreen() {
               value={passwordConfirm}
               onChangeText={setPasswordConfirm}
               secureTextEntry
+              autoCapitalize="none"
             />
           </View>
 

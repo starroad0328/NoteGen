@@ -6,6 +6,7 @@ NoteGen Backend API
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import init_db, get_db_session
@@ -85,6 +86,9 @@ app.include_router(
     curriculum.router,
     tags=["Curriculum"]
 )
+
+# 업로드된 이미지 정적 파일 서빙
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
 @app.on_event("startup")

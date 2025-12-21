@@ -10,12 +10,10 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: '#FFFEF8' },
         }}
       >
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
-        <Stack.Screen name="upload" />
         <Stack.Screen name="processing/[id]" />
-        <Stack.Screen name="notes/index" />
         <Stack.Screen name="notes/[id]" />
       </Stack>
     </AuthProvider>
