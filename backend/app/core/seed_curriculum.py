@@ -12,6 +12,7 @@ from app.models.curriculum import (
     KOREAN_DOMAINS_2015_MIDDLE, KOREAN_STANDARDS_2015_MIDDLE,
     ENGLISH_DOMAINS_2015_MIDDLE, ENGLISH_STANDARDS_2015_MIDDLE,
     SOCIAL_DOMAINS_2015_MIDDLE, SOCIAL_STANDARDS_2015_MIDDLE,
+    SCIENCE_DOMAINS_2015_MIDDLE, SCIENCE_STANDARDS_2015_MIDDLE,
 )
 from app.models.user import SchoolLevel
 
@@ -190,6 +191,14 @@ def seed_curriculum(db: Session):
         print(f"[SEED] Social domains: {len(social_domains)} loaded")
         social_std_count = seed_standards(db, social_domains, SOCIAL_STANDARDS_2015_MIDDLE)
         print(f"[SEED] Social standards: {social_std_count} added")
+
+    # 6. 과학 영역 및 성취기준 삽입
+    science_subject = subjects.get("science")
+    if science_subject:
+        science_domains = seed_domains(db, science_subject, SCIENCE_DOMAINS_2015_MIDDLE)
+        print(f"[SEED] Science domains: {len(science_domains)} loaded")
+        science_std_count = seed_standards(db, science_domains, SCIENCE_STANDARDS_2015_MIDDLE)
+        print(f"[SEED] Science standards: {science_std_count} added")
 
     db.commit()
     print("[SEED] Curriculum seed complete!")
