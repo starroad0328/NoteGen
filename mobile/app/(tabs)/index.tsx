@@ -13,7 +13,7 @@ export default function HomeTab() {
   const router = useRouter()
   const { user, token, loading } = useAuth()
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
-  const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell'>('basic_summary')
+  const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'error_note' | 'vocab'>('basic_summary')
   const [uploading, setUploading] = useState(false)
 
   const takePhoto = async () => {
@@ -149,6 +149,26 @@ export default function HomeTab() {
             <View style={styles.methodInfo}>
               <Text style={styles.methodTitle}>코넬식 정리</Text>
               <Text style={styles.methodDesc}>키워드 + 본문 + 요약 구조</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.methodCard, organizeMethod === 'error_note' && styles.methodCardSelected]}
+            onPress={() => setOrganizeMethod('error_note')}
+          >
+            <Text style={styles.methodIcon}>❌</Text>
+            <View style={styles.methodInfo}>
+              <Text style={styles.methodTitle}>오답노트</Text>
+              <Text style={styles.methodDesc}>문제 + 오답 + 정답 + 해설</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.methodCard, organizeMethod === 'vocab' && styles.methodCardSelected]}
+            onPress={() => setOrganizeMethod('vocab')}
+          >
+            <Text style={styles.methodIcon}>📚</Text>
+            <View style={styles.methodInfo}>
+              <Text style={styles.methodTitle}>단어장</Text>
+              <Text style={styles.methodDesc}>단어 + 뜻 + 예문 표 정리</Text>
             </View>
           </TouchableOpacity>
         </View>

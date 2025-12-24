@@ -315,10 +315,30 @@ class AIService:
     ) -> tuple[str, str]:
         """
         노트 타입에 따른 프롬프트 선택
+        - 사용자가 명시적으로 선택한 method 우선
+        - 그 외에는 AI 감지 결과 사용
 
         Returns:
             (prompt_content, system_message)
         """
+        # 1. 사용자가 명시적으로 오답노트 선택
+        if method == OrganizeMethod.ERROR_NOTE:
+            # 수학이면 수학 오답노트, 아니면 일반 오답노트
+            if detected_subject == "math":
+                prompt = self._load_prompt("math_error_note")
+                if prompt:
+                    return prompt, "수학 오답노트 형식으로 정리. 메타데이터 제거. 깔끔한 마크다운만."
+            prompt = self._load_prompt("general_error_note")
+            if prompt:
+                return prompt, "오답노트 형식으로 정리. 메타데이터 제거. 깔끔한 마크다운만."
+
+        # 2. 사용자가 명시적으로 단어장 선택
+        if method == OrganizeMethod.VOCAB:
+            prompt = self._load_prompt("english_vocab")
+            if prompt:
+                return prompt, "영어 단어장 형식으로 정리. 메타데이터 제거. 깔끔한 마크다운만."
+
+        # 3. AI 감지 기반 (기존 로직) - BASIC_SUMMARY, CORNELL일 때
         # 수학 오답노트
         if detected_note_type == "error_note" and detected_subject == "math":
             prompt = self._load_prompt("math_error_note")

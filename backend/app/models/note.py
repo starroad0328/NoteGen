@@ -14,6 +14,8 @@ class OrganizeMethod(str, enum.Enum):
     """정리 방식"""
     BASIC_SUMMARY = "basic_summary"  # 기본 요약 정리
     CORNELL = "cornell"  # 코넬식 정리
+    ERROR_NOTE = "error_note"  # 오답노트
+    VOCAB = "vocab"  # 단어장
 
 
 class NoteType(str, enum.Enum):
