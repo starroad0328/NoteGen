@@ -8,15 +8,34 @@ from typing import Optional, Dict, List
 from openai import OpenAI
 from app.core.config import settings
 from app.core.curriculum import get_curriculum_context, detect_subject
-from app.models.note import OrganizeMethod
+from app.models.note import OrganizeMethod, NoteType, Subject
 from app.models.user import AIModel, UserPlan, SchoolLevel
+import os
+from pathlib import Path
 
 
 class AIService:
-    """AI 정리 서비스 (2단계 파이프라인)"""
+    """AI 정리 서비스 (2단계 파이프라인 + 노트 타입 감지)"""
+
+    # 프롬프트 파일 경로
+    PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
     def __init__(self):
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self._prompt_cache: Dict[str, str] = {}
+
+    def _load_prompt(self, prompt_name: str) -> Optional[str]:
+        """프롬프트 파일 로드 (캐싱)"""
+        if prompt_name in self._prompt_cache:
+            return self._prompt_cache[prompt_name]
+
+        prompt_path = self.PROMPTS_DIR / f"{prompt_name}.txt"
+        if prompt_path.exists():
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                self._prompt_cache[prompt_name] = content
+                return content
+        return None
 
     async def organize_note(
         self,
@@ -27,13 +46,13 @@ class AIService:
         on_step: Optional[callable] = None,
         school_level: Optional[SchoolLevel] = None,
         grade: Optional[int] = None
-    ) -> str:
+    ) -> Dict:
         """
         필기 텍스트를 3단계로 정리
 
         0단계: OCR 정제 (띄어쓰기, 오타)
-        1단계: 구조 파악 (목차, 주제 분류)
-        2단계: 원본 유지 + 보강 정리 (교육과정 반영)
+        1단계: 구조 파악 + 과목/노트타입 감지
+        2단계: 타입별 프롬프트로 정리 생성
 
         Args:
             ocr_text: OCR로 추출한 텍스트
@@ -45,7 +64,11 @@ class AIService:
             grade: 학년 (1, 2, 3)
 
         Returns:
-            정리된 노트 (마크다운 형식)
+            Dict: {
+                "content": 정리된 노트 (마크다운),
+                "detected_subject": 감지된 과목,
+                "detected_note_type": 감지된 노트 타입
+            }
         """
         if not ocr_text or not ocr_text.strip():
             raise ValueError("정리할 텍스트가 비어있습니다.")
@@ -63,19 +86,30 @@ class AIService:
 
             print(f"[AI] 0단계 완료. 정제 텍스트 길이: {len(refined_text)}", flush=True)
 
-            # 1단계: 구조 파악
+            # 1단계: 구조 파악 + 과목/노트타입 감지
             print("[AI] 1단계 시작...", flush=True)
             if on_step:
                 await on_step(1, "필기 구조 분석 중...")
 
-            structure = await self._step1_analyze_structure(blocks_data, refined_text, ai_model)
+            analysis_result = await self._step1_analyze_structure(blocks_data, refined_text, ai_model)
 
-            print(f"[AI] 1단계 완료. 구조 길이: {len(structure)}", flush=True)
+            # 감지된 과목/노트타입 추출
+            detected_subject = analysis_result.get("subject", "other")
+            detected_note_type = analysis_result.get("note_type", "general")
+            structure_text = analysis_result.get("structure", "")
 
-            # 2단계: 원본 유지 + 보강 정리 (교육과정 반영)
+            print(f"[AI] 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
+
+            # 2단계: 타입별 프롬프트로 정리 생성
             print("[AI] 2단계 시작...", flush=True)
             if on_step:
-                await on_step(2, "AI 정리 생성 중...")
+                # 노트 타입에 따른 메시지 표시
+                type_msg = {
+                    "error_note": "오답노트 형식으로 정리 중...",
+                    "vocab": "단어장 형식으로 정리 중...",
+                    "general": "AI 정리 생성 중..."
+                }
+                await on_step(2, type_msg.get(detected_note_type, "AI 정리 생성 중..."))
 
             # 교육과정 컨텍스트 생성
             curriculum_context = get_curriculum_context(school_level, grade)
@@ -83,12 +117,17 @@ class AIService:
                 print(f"[AI] 교육과정 컨텍스트 적용: {school_level.value if school_level else ''} {grade}학년", flush=True)
 
             organized = await self._step2_organize_with_structure(
-                blocks_data, refined_text, structure, method, ai_model, curriculum_context
+                blocks_data, refined_text, structure_text, method, ai_model, curriculum_context,
+                detected_subject, detected_note_type
             )
 
             print(f"[AI] 2단계 완료. 결과 길이: {len(organized)}", flush=True)
 
-            return organized
+            return {
+                "content": organized,
+                "detected_subject": detected_subject,
+                "detected_note_type": detected_note_type
+            }
 
         except Exception as e:
             print(f"[AI] 에러 발생: {str(e)}", flush=True)
@@ -178,12 +217,13 @@ class AIService:
         blocks_data: Optional[Dict],
         ocr_text: str,
         ai_model: AIModel
-    ) -> str:
+    ) -> Dict:
         """
-        1단계: 필기 구조 파악 (가볍게)
+        1단계: 필기 구조 파악 + 과목/노트타입 감지
+        - 과목 감지 (수학, 영어, 국어, 역사, 사회, 과학)
+        - 노트 타입 감지 (일반필기, 오답노트, 단어장)
         - 목차 뽑기
         - 주제 분류
-        - 누락 위험 구간 체크
         """
         # 블록 데이터 사용 (토큰 절약)
         if blocks_data:
@@ -193,17 +233,31 @@ class AIService:
             content = ocr_text
             input_desc = "(원본 텍스트)"
 
-        prompt = f"""다음 필기의 구조를 파악해주세요. {input_desc}
+        prompt = f"""다음 필기를 분석해주세요. {input_desc}
 
-[출력 형식]
-- 주제: (한 줄)
-- 섹션: (관련 내용은 같은 섹션으로 묶어서 나열)
-- 그룹핑: (어떤 내용이 어느 주제에 속하는지)
-- 주의: (누락 위험 구간)
+[분석 항목]
+1. 과목 감지: math, english, korean, history, social, science, other 중 하나
+2. 노트 타입 감지:
+   - general: 일반 필기 (개념 정리, 수업 내용)
+   - error_note: 오답노트 (문제, 풀이, 정답/오답 포함)
+   - vocab: 단어장 (영어 단어, 뜻, 예문)
+3. 구조 파악: 섹션, 그룹핑, 주의사항
 
-[그룹핑 힌트]
-- 같은 시대/국가/주제는 하나로 묶기
-- 세부 개념(제도, 인물, 사건)은 해당 국가/시대에 포함
+[노트 타입 판단 기준]
+- error_note: "문제", "풀이", "정답", "오답", "해설", "O/X" 등 포함
+- vocab: 영어 단어 + 뜻/예문 형태
+- general: 그 외 일반적인 필기
+
+[출력 형식 - 반드시 JSON]
+```json
+{{
+  "subject": "math|english|korean|history|social|science|other",
+  "note_type": "general|error_note|vocab",
+  "structure": "주제 및 섹션 설명",
+  "sections": ["섹션1", "섹션2"],
+  "grouping": "그룹핑 힌트"
+}}
+```
 
 [필기]
 {content}
@@ -217,14 +271,14 @@ class AIService:
             messages=[
                 {
                     "role": "system",
-                    "content": "필기 구조만 간단히 파악. 짧게."
+                    "content": "필기 분석 후 JSON 형식으로만 응답. 다른 텍스트 없이 JSON만."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            max_completion_tokens=3000  # 1단계: reasoning 포함
+            max_completion_tokens=3000
         )
 
         with open('C:/NoteGen/backend/debug.log', 'a', encoding='utf-8') as f:
@@ -234,8 +288,57 @@ class AIService:
         if not result or not result.strip():
             if response.choices[0].finish_reason == "length":
                 raise Exception("1단계 토큰 한도 초과")
-            return ""
-        return result.strip()
+            return {"subject": "other", "note_type": "general", "structure": "", "sections": [], "grouping": ""}
+
+        # JSON 파싱 시도
+        try:
+            # ```json ... ``` 블록 추출
+            json_str = result.strip()
+            if "```json" in json_str:
+                json_str = json_str.split("```json")[1].split("```")[0].strip()
+            elif "```" in json_str:
+                json_str = json_str.split("```")[1].split("```")[0].strip()
+
+            parsed = json.loads(json_str)
+            print(f"[AI] 1단계 감지 결과: subject={parsed.get('subject')}, note_type={parsed.get('note_type')}", flush=True)
+            return parsed
+        except json.JSONDecodeError as e:
+            print(f"[AI] JSON 파싱 실패, fallback: {e}", flush=True)
+            # 파싱 실패 시 기본값 + 원본 텍스트를 structure에 저장
+            return {"subject": "other", "note_type": "general", "structure": result, "sections": [], "grouping": ""}
+
+    def _get_prompt_for_note_type(
+        self,
+        detected_subject: str,
+        detected_note_type: str,
+        method: OrganizeMethod
+    ) -> tuple[str, str]:
+        """
+        노트 타입에 따른 프롬프트 선택
+
+        Returns:
+            (prompt_content, system_message)
+        """
+        # 수학 오답노트
+        if detected_note_type == "error_note" and detected_subject == "math":
+            prompt = self._load_prompt("math_error_note")
+            if prompt:
+                return prompt, "수학 오답노트 형식으로 정리. 메타데이터 제거. 깔끔한 마크다운만."
+
+        # 영어 단어장
+        if detected_note_type == "vocab" and detected_subject == "english":
+            prompt = self._load_prompt("english_vocab")
+            if prompt:
+                return prompt, "영어 단어장 형식으로 정리. 메타데이터 제거. 깔끔한 마크다운만."
+
+        # 일반 오답노트 (수학 외 과목)
+        if detected_note_type == "error_note":
+            prompt = self._load_prompt("general_error_note")
+            if prompt:
+                return prompt, "오답노트 형식으로 정리. 메타데이터 제거. 깔끔한 마크다운만."
+
+        # 기본: 일반 필기 (기존 로직)
+        return None, "학생 필기 정리. 메타데이터([bX], y좌표) 절대 출력 금지. 깔끔한 마크다운만."
 
     async def _step2_organize_with_structure(
         self,
@@ -244,12 +347,13 @@ class AIService:
         structure: str,
         method: OrganizeMethod,
         ai_model: AIModel,
-        curriculum_context: str = ""
+        curriculum_context: str = "",
+        detected_subject: str = "other",
+        detected_note_type: str = "general"
     ) -> str:
         """
-        2단계: 원본 유지 + 보강 정리 (핵심)
-        - 원본 필기 내용은 삭제/요약 금지
-        - 빠진 설명만 [보강]으로 추가
+        2단계: 타입별 프롬프트로 정리 생성
+        - 오답노트/단어장/일반필기 분기
         - 교육과정에 맞는 설명 제공
         """
         # 블록 데이터 사용 (토큰 절약)
@@ -260,9 +364,27 @@ class AIService:
             content = ocr_text
             block_count = 0
 
-        # 정리 방식에 따른 포맷 지시
-        if method == OrganizeMethod.BASIC_SUMMARY:
-            format_instruction = """[출력 형식]
+        # 노트 타입별 프롬프트 선택
+        type_prompt, system_message = self._get_prompt_for_note_type(
+            detected_subject, detected_note_type, method
+        )
+
+        if type_prompt:
+            # 타입별 전용 프롬프트 사용
+            curriculum_section = f"\n{curriculum_context}\n" if curriculum_context else ""
+
+            prompt = f"""{type_prompt}
+{curriculum_section}
+[구조 참고]
+{structure}
+
+[필기 내용]
+{content}
+"""
+        else:
+            # 기본 프롬프트 (기존 로직)
+            if method == OrganizeMethod.BASIC_SUMMARY:
+                format_instruction = """[출력 형식]
 # 제목
 
 ## 소제목1
@@ -272,8 +394,8 @@ class AIService:
 ## 소제목2
 - 핵심 내용
 """
-        elif method == OrganizeMethod.CORNELL:
-            format_instruction = """[출력 형식]
+            elif method == OrganizeMethod.CORNELL:
+                format_instruction = """[출력 형식]
 # 제목
 
 | 키워드 | 설명 |
@@ -282,17 +404,12 @@ class AIService:
 
 **요약**: 1문장
 """
-        else:
-            format_instruction = "글머리표로 정리"
+            else:
+                format_instruction = "글머리표로 정리"
 
-        # 교육과정 컨텍스트 추가
-        curriculum_section = ""
-        if curriculum_context:
-            curriculum_section = f"""
-{curriculum_context}
-"""
+            curriculum_section = f"\n{curriculum_context}\n" if curriculum_context else ""
 
-        prompt = f"""필기를 정리해주세요.
+            prompt = f"""필기를 정리해주세요.
 
 [필수 규칙]
 - 블록ID, 좌표 등 메타데이터는 출력에서 완전히 제거
@@ -321,14 +438,14 @@ class AIService:
             messages=[
                 {
                     "role": "system",
-                    "content": "학생 필기 정리. 메타데이터([bX], y좌표) 절대 출력 금지. 깔끔한 마크다운만."
+                    "content": system_message
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            max_completion_tokens=6000  # 2단계: 충분히
+            max_completion_tokens=6000
         )
 
         result = response.choices[0].message.content

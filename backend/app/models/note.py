@@ -16,6 +16,24 @@ class OrganizeMethod(str, enum.Enum):
     CORNELL = "cornell"  # 코넬식 정리
 
 
+class NoteType(str, enum.Enum):
+    """노트 타입 (AI 자동 감지)"""
+    GENERAL = "general"  # 일반 필기
+    ERROR_NOTE = "error_note"  # 오답노트 (수학/과학/사회 등)
+    VOCAB = "vocab"  # 단어장 (영어)
+
+
+class Subject(str, enum.Enum):
+    """과목"""
+    MATH = "math"  # 수학
+    ENGLISH = "english"  # 영어
+    KOREAN = "korean"  # 국어
+    HISTORY = "history"  # 역사
+    SOCIAL = "social"  # 사회
+    SCIENCE = "science"  # 과학
+    OTHER = "other"  # 기타
+
+
 class ProcessStatus(str, enum.Enum):
     """처리 상태"""
     UPLOADING = "uploading"  # 업로드 중
@@ -51,6 +69,16 @@ class Note(Base):
     organize_method = Column(
         Enum(OrganizeMethod),
         default=OrganizeMethod.BASIC_SUMMARY
+    )
+
+    # AI 감지 결과
+    detected_subject = Column(
+        Enum(Subject),
+        nullable=True
+    )
+    detected_note_type = Column(
+        Enum(NoteType),
+        nullable=True
     )
 
     # 정리 결과

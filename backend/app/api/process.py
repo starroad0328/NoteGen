@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import json
 
 from app.core.database import get_db
-from app.models.note import Note, ProcessStatus
+from app.models.note import Note, ProcessStatus, Subject, NoteType
 from app.models.user import User
 from app.schemas.note import ProcessResponse
 from app.services.ocr_service import ocr_service
@@ -102,7 +102,7 @@ async def process_note_pipeline(note_id: int):
             f.write(f"[{note_id}] [PROCESS] organize_note 호출 직전\n")
             f.write(f"[{note_id}] [PROCESS] ocr_metadata type: {type(ocr_metadata)}\n")
 
-        organized_content = await ai_service.organize_note(
+        result = await ai_service.organize_note(
             ocr_text=ocr_text,
             method=note.organize_method,
             ocr_metadata=ocr_metadata,
@@ -114,8 +114,25 @@ async def process_note_pipeline(note_id: int):
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] [PROCESS] organize_note 호출 완료\n")
 
+        # 결과에서 콘텐츠와 감지 정보 추출
+        organized_content = result.get("content", "")
+        detected_subject_str = result.get("detected_subject", "other")
+        detected_note_type_str = result.get("detected_note_type", "general")
+
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] AI result length: {len(organized_content) if organized_content else 0}\n")
+            f.write(f"[{note_id}] Detected: subject={detected_subject_str}, note_type={detected_note_type_str}\n")
+
+        # 문자열을 Enum으로 변환
+        try:
+            note.detected_subject = Subject(detected_subject_str)
+        except ValueError:
+            note.detected_subject = Subject.OTHER
+
+        try:
+            note.detected_note_type = NoteType(detected_note_type_str)
+        except ValueError:
+            note.detected_note_type = NoteType.GENERAL
 
         note.organized_content = organized_content
         note.status = ProcessStatus.COMPLETED
