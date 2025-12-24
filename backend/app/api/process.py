@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import json
 
 from app.core.database import get_db
-from app.models.note import Note, ProcessStatus, Subject, NoteType
+from app.models.note import Note, ProcessStatus, Subject, NoteType, OrganizeMethod
 from app.models.user import User
 from app.schemas.note import ProcessResponse
 from app.services.ocr_service import ocr_service
@@ -40,11 +40,12 @@ async def process_note_pipeline(note_id: int):
 
         image_paths = note.image_paths.split(",")
 
-        # OCR 실행
+        # OCR 실행 (오답노트면 Google Vision 사용)
+        use_google = note.organize_method == OrganizeMethod.ERROR_NOTE
         with open('./debug.log', 'a') as f:
-            f.write(f"\n[{note_id}] Starting OCR...\n")
+            f.write(f"\n[{note_id}] Starting OCR... (use_google={use_google})\n")
 
-        ocr_result = await ocr_service.extract_text_from_images(image_paths)
+        ocr_result = await ocr_service.extract_text_from_images(image_paths, use_google_for_math=use_google)
 
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] OCR result type: {type(ocr_result)}\n")

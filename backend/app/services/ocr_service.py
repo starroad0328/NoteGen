@@ -9,6 +9,7 @@ import base64
 import json
 import time
 import uuid
+from pathlib import Path
 import httpx
 from app.core.config import settings
 
@@ -20,12 +21,17 @@ class OCRService:
         self.use_clova_ocr = bool(settings.CLOVA_OCR_SECRET_KEY and settings.CLOVA_OCR_INVOKE_URL)
         self.use_google_vision = bool(settings.GOOGLE_APPLICATION_CREDENTIALS)
 
-    async def extract_text_from_images(self, image_paths: List[str]) -> tuple[str, dict]:
+    async def extract_text_from_images(
+        self,
+        image_paths: List[str],
+        use_google_for_math: bool = False
+    ) -> tuple[str, dict]:
         """
         여러 이미지에서 텍스트 추출
 
         Args:
             image_paths: 이미지 파일 경로 리스트
+            use_google_for_math: True면 수학 오답노트용으로 Google Vision 사용
 
         Returns:
             (추출된 텍스트, OCR 메타데이터)
@@ -34,7 +40,7 @@ class OCRService:
         all_metadata = {"images": []}
 
         for image_path in image_paths:
-            result = await self.extract_text_from_image(image_path)
+            result = await self.extract_text_from_image(image_path, use_google_for_math)
             if result:
                 text, metadata = result
                 all_text.append(text)
@@ -42,18 +48,27 @@ class OCRService:
 
         return "\n\n".join(all_text), all_metadata
 
-    async def extract_text_from_image(self, image_path: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+    async def extract_text_from_image(
+        self,
+        image_path: str,
+        use_google_for_math: bool = False
+    ) -> Optional[Tuple[str, Dict[str, Any]]]:
         """
         단일 이미지에서 텍스트 추출
 
         Args:
             image_path: 이미지 파일 경로
+            use_google_for_math: True면 수학 오답노트용으로 Google Vision 사용
 
         Returns:
             (추출된 텍스트, OCR 메타데이터)
         """
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"이미지 파일을 찾을 수 없습니다: {image_path}")
+
+        # 수학 오답노트인 경우 Google Vision 사용 (설정되어 있으면)
+        if use_google_for_math and self.use_google_vision:
+            return await self._extract_with_google_vision(image_path)
 
         # CLOVA OCR 우선 사용
         if self.use_clova_ocr:
@@ -333,28 +348,99 @@ class OCRService:
             "blocks": blocks
         }
 
-    async def _extract_with_google_vision(self, image_path: str) -> Optional[str]:
-        """Google Cloud Vision API로 텍스트 추출"""
+    async def _extract_with_google_vision(self, image_path: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """Google Cloud Vision API로 텍스트 추출 (수학 오답노트용)"""
         try:
             from google.cloud import vision
+            from google.oauth2 import service_account
+            from PIL import Image as PILImage
 
-            client = vision.ImageAnnotatorClient()
+            # credentials 파일 경로 (절대 경로로 변환)
+            credentials_path = Path(__file__).parent.parent.parent / "credentials" / "google-vision.json"
+            credentials = service_account.Credentials.from_service_account_file(str(credentials_path))
+            client = vision.ImageAnnotatorClient(credentials=credentials)
 
             with open(image_path, "rb") as image_file:
                 content = image_file.read()
 
             image = vision.Image(content=content)
 
-            # 텍스트 감지 (손글씨 포함)
+            # 텍스트 감지 (손글씨 포함 - DOCUMENT_TEXT_DETECTION이 수학 기호에 더 좋음)
             response = client.document_text_detection(image=image)
 
             if response.error.message:
                 raise Exception(f"Google Vision API Error: {response.error.message}")
 
+            # 이미지 크기 가져오기
+            try:
+                pil_image = PILImage.open(image_path)
+                image_width, image_height = pil_image.size
+            except Exception:
+                image_width, image_height = 1000, 1000
+
             # 전체 텍스트 추출
             text = response.full_text_annotation.text
 
-            return text.strip() if text else None
+            # 메타데이터 구성 (CLOVA 형식과 호환)
+            ocr_words = []
+            blocks = []
+
+            # Google Vision의 word 단위 정보 추출
+            for page in response.full_text_annotation.pages:
+                for block_idx, block in enumerate(page.blocks):
+                    block_text_parts = []
+                    for paragraph in block.paragraphs:
+                        for word in paragraph.words:
+                            word_text = "".join([symbol.text for symbol in word.symbols])
+                            block_text_parts.append(word_text)
+
+                            # bbox 추출
+                            vertices = word.bounding_box.vertices
+                            if vertices:
+                                xs = [v.x for v in vertices]
+                                ys = [v.y for v in vertices]
+                                x, y = min(xs), min(ys)
+                                w, h = max(xs) - x, max(ys) - y
+                                ocr_words.append({
+                                    "text": word_text,
+                                    "x": x, "y": y, "w": w, "h": h,
+                                    "cy": y + h // 2,
+                                    "confidence": word.confidence
+                                })
+
+                    # 블록 정보 추가
+                    block_vertices = block.bounding_box.vertices
+                    if block_vertices:
+                        bxs = [v.x for v in block_vertices]
+                        bys = [v.y for v in block_vertices]
+                        bx, by = min(bxs), min(bys)
+                        bw, bh = max(bxs) - bx, max(bys) - by
+
+                        # 정규화 (0~1000)
+                        norm_x = int(bx * 1000 / image_width) if image_width else 0
+                        norm_y = int(by * 1000 / image_height) if image_height else 0
+                        norm_w = int(bw * 1000 / image_width) if image_width else 0
+                        norm_h = int(bh * 1000 / image_height) if image_height else 0
+
+                        blocks.append({
+                            "id": f"b{block_idx}",
+                            "bbox": [norm_x, norm_y, norm_w, norm_h],
+                            "text": " ".join(block_text_parts),
+                            "confidence": block.confidence,
+                            "line_count": len(block.paragraphs)
+                        })
+
+            metadata = {
+                "image_path": image_path,
+                "image_size": {"w": image_width, "h": image_height},
+                "words": ocr_words,
+                "blocks": blocks,
+                "total_words": len(ocr_words),
+                "total_blocks": len(blocks),
+                "ocr_engine": "google_vision"
+            }
+
+            return (text.strip(), metadata) if text else None
 
         except ImportError:
             raise Exception(
@@ -362,7 +448,7 @@ class OCRService:
                 "pip install google-cloud-vision을 실행하세요."
             )
         except Exception as e:
-            raise Exception(f"OCR 처리 중 오류 발생: {str(e)}")
+            raise Exception(f"Google Vision OCR 처리 중 오류 발생: {str(e)}")
 
     async def _extract_with_tesseract(self, image_path: str) -> Optional[str]:
         """Tesseract OCR로 텍스트 추출 (대안)"""

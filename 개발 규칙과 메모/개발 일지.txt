@@ -4,6 +4,49 @@
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2025-12-24 (화)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+주제: 오답노트/단어장 템플릿 + Google Vision OCR 통합
+
+작업 내용:
+  1. 과목/노트타입 자동 감지 기능
+     - NoteType enum 추가 (general, error_note, vocab)
+     - Subject enum 추가 (math, english, korean, history, social, science, other)
+     - AI 1단계에서 JSON으로 과목/타입 감지
+     - DB에 detected_subject, detected_note_type 저장
+
+  2. 노트 타입별 전용 프롬프트
+     - math_error_note.txt: 수학 오답노트 (문제/오답/정답/해설)
+     - english_vocab.txt: 영어 단어장 (단어/뜻/예문 표)
+     - general_error_note.txt: 일반 오답노트
+
+  3. 모바일 UI 업데이트
+     - 정리 방식에 오답노트/단어장 버튼 추가
+     - 카메라 촬영 시 이미지 자르기 활성화 (allowsEditing: true)
+
+  4. Google Vision OCR 통합 (수학 오답노트용)
+     - google-cloud-vision 패키지 설치
+     - credentials 파일 직접 로드 방식 구현
+     - 오답노트(error_note) 선택 시 Google Vision 사용
+     - 기본 정리는 CLOVA OCR 유지
+
+  5. 수학 OCR 정제 프롬프트 개선
+     - 수학 기호 복원 규칙 추가 (2->제곱, V->루트 등)
+     - 블록ID/좌표 메타데이터 제거 규칙 강화
+
+커밋:
+  - 85100f7 feat: 과목/노트타입 자동 감지 및 전용 프롬프트 분기
+  - c3e51b4 feat: 오답노트/단어장 정리 방식 선택 UI 추가
+  - ad0dedd feat: 카메라 촬영 시 이미지 자르기 활성화
+  - f4163af fix: 수학 오답노트 OCR 정제 및 프롬프트 개선
+
+다음 작업:
+  - 월간 사용량 제한 (10회/월)
+  - 앱 스토어 에셋 준비
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  2025-12-23 (월)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
