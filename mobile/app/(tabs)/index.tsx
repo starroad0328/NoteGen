@@ -26,7 +26,7 @@ export default function HomeTab() {
     }
     const permission = await ImagePicker.requestCameraPermissionsAsync()
     if (!permission.granted) { Alert.alert('권한 필요', '카메라 사용 권한이 필요합니다.'); return }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: false })
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
     if (!result.canceled && result.assets) {
       if (images.length >= 3) { Alert.alert('제한', '최대 3개까지'); return }
       setImages([...images, ...result.assets])
