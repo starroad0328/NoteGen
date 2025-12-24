@@ -12,9 +12,13 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import Markdown from 'react-native-markdown-display'
 import * as Clipboard from 'expo-clipboard'
+import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view'
 import { notesAPI, Note } from '../../services/api'
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
+// 캔버스 크기 (A4 비율 기반, 큰 도화지)
+const CANVAS_WIDTH = SCREEN_WIDTH * 2
+const CANVAS_HEIGHT = SCREEN_HEIGHT * 2.5
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
 
 // 섹션 타입별 스타일
@@ -219,51 +223,142 @@ export default function NoteScreen() {
         </View>
       </View>
 
-      {/* 목차 힌트 */}
-      <TouchableOpacity style={styles.swipeHint} onPress={openDrawer}>
-        <Text style={styles.swipeHintText}>☰ 탭해서 목차 보기</Text>
-      </TouchableOpacity>
+      {/* 목차 힌트 - 코넬식이 아닐 때만 */}
+      {note.organize_method !== 'cornell' && (
+        <TouchableOpacity style={styles.swipeHint} onPress={openDrawer}>
+          <Text style={styles.swipeHintText}>☰ 탭해서 목차 보기</Text>
+        </TouchableOpacity>
+      )}
 
-      {/* 메인 콘텐츠 */}
-      <ScrollView
-        ref={contentScrollRef}
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {sections.map((section, index) => {
-          const style = getSectionStyle(section.title)
-          return (
-            <View
-              key={index}
-              style={styles.section}
-              onLayout={(e) => {
-                sectionRefs.current[index] = e.nativeEvent.layout.y
-              }}
+      {/* 코넬식 노트 레이아웃 - 캔버스 스타일 */}
+      {note.organize_method === 'cornell' ? (() => {
+        // 파싱 로직 - 새 형식 또는 기존 형식
+        const content = note.organized_content || ''
+        const isNewFormat = content.includes('===KEYWORDS===') || content.includes('===NOTES===')
+
+        let keywords = ''
+        let notes = ''
+        let summary = ''
+        let title = note.title
+
+        if (isNewFormat) {
+          // 새 형식: ===MARKER=== 사용
+          const titleMatch = content.match(/===TITLE===\s*([\s\S]*?)(?====|$)/)
+          if (titleMatch) title = titleMatch[1].trim()
+          keywords = content.match(/===KEYWORDS===\s*([\s\S]*?)(?====|$)/)?.[1]?.trim() || ''
+          notes = content.match(/===NOTES===\s*([\s\S]*?)(?====|$)/)?.[1]?.trim() || ''
+          summary = content.match(/===SUMMARY===\s*([\s\S]*?)(?====|$)/)?.[1]?.trim() || ''
+        } else {
+          // 기존 형식: 노트 영역에 전체 내용 표시
+          notes = content
+
+          // 키워드: 헤딩(#, ##)에서 추출
+          const headings = content.match(/^#{1,2}\s+(.+)$/gm)
+          if (headings) {
+            keywords = headings
+              .map(h => h.replace(/^#+\s*/, '').trim())
+              .map(k => `• ${k}`)
+              .join('\n')
+          }
+
+          // 요약: 마지막 문단 또는 **요약** 섹션
+          const summaryMatch = content.match(/(?:\*\*요약\*\*|##?\s*요약)[:\s]*([\s\S]*?)$/i)
+          if (summaryMatch) {
+            summary = summaryMatch[1].trim()
+          }
+        }
+
+        return (
+          <View style={cornellStyles.zoomContainer}>
+            <ReactNativeZoomableView
+              maxZoom={2.5}
+              minZoom={0.4}
+              initialZoom={0.5}
+              bindToBorders={true}
+              contentWidth={CANVAS_WIDTH}
+              contentHeight={CANVAS_HEIGHT}
+              panBoundaryPadding={50}
+              style={cornellStyles.zoomView}
             >
-              <View style={[styles.sectionHeader, { borderLeftColor: style.color }]}>
-                <Text style={styles.sectionIcon}>{style.icon}</Text>
-                <Text style={[styles.sectionTitle, { color: style.color }]}>
-                  {section.title}
-                </Text>
-              </View>
-              <View style={styles.sectionContent}>
-                <Markdown style={markdownStyles}>
-                  {section.content.trim()}
-                </Markdown>
-              </View>
-            </View>
-          )
-        })}
+              {/* 종이 전체가 노트 */}
+              <View style={[cornellStyles.paper, { width: CANVAS_WIDTH, height: CANVAS_HEIGHT }]}>
+                {/* 줄 노트 라인 */}
+                {[...Array(100)].map((_, i) => (
+                  <View key={`line${i}`} style={[cornellStyles.noteLine, { top: 80 + i * 32 }]} />
+                ))}
 
-        {/* 노트 정보 */}
-        <View style={styles.info}>
-          <Text style={styles.infoText}>
-            생성일: {new Date(note.created_at).toLocaleString('ko-KR')}
-          </Text>
-          <Text style={styles.infoText}>정리 방식: {note.organize_method}</Text>
-        </View>
-      </ScrollView>
+                {/* 제목 */}
+                <View style={cornellStyles.titleRow}>
+                  <Text style={cornellStyles.titleText}>{title}</Text>
+                </View>
+
+                {/* 키워드 영역 (왼쪽 여백) */}
+                <View style={cornellStyles.keywordMargin}>
+                  <Text style={cornellStyles.marginLabel}>키워드</Text>
+                  <Text style={cornellStyles.keywordText}>{keywords}</Text>
+                </View>
+
+                {/* 메인 노트 내용 */}
+                <View style={cornellStyles.noteContent}>
+                  <Markdown style={cornellMarkdownStyles}>{notes}</Markdown>
+                </View>
+
+                {/* 요약 (하단) */}
+                <View style={cornellStyles.summaryRow}>
+                  <Text style={cornellStyles.marginLabel}>요약</Text>
+                  <Text style={cornellStyles.summaryText}>{summary}</Text>
+                </View>
+              </View>
+            </ReactNativeZoomableView>
+
+            {/* 줌 안내 */}
+            <View style={cornellStyles.zoomHint}>
+              <Text style={cornellStyles.zoomHintText}>🔍 핀치로 확대/축소</Text>
+            </View>
+          </View>
+        )
+      })() : (
+        /* 기본 레이아웃 */
+        <ScrollView
+          ref={contentScrollRef}
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {sections.map((section, index) => {
+            const style = getSectionStyle(section.title)
+            return (
+              <View
+                key={index}
+                style={styles.section}
+                onLayout={(e) => {
+                  sectionRefs.current[index] = e.nativeEvent.layout.y
+                }}
+              >
+                <View style={[styles.sectionHeader, { borderLeftColor: style.color }]}>
+                  <Text style={styles.sectionIcon}>{style.icon}</Text>
+                  <Text style={[styles.sectionTitle, { color: style.color }]}>
+                    {section.title}
+                  </Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <Markdown style={markdownStyles}>
+                    {section.content.trim()}
+                  </Markdown>
+                </View>
+              </View>
+            )
+          })}
+
+          {/* 노트 정보 */}
+          <View style={styles.info}>
+            <Text style={styles.infoText}>
+              생성일: {new Date(note.created_at).toLocaleString('ko-KR')}
+            </Text>
+            <Text style={styles.infoText}>정리 방식: {note.organize_method}</Text>
+          </View>
+        </ScrollView>
+      )}
 
       {/* 드로어 오버레이 */}
       {drawerOpen && (
@@ -369,6 +464,155 @@ const markdownStyles = StyleSheet.create({
   },
   td: {
     padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+})
+
+// 코넬식 노트 스타일 - 종이 한 장
+const cornellStyles = StyleSheet.create({
+  zoomContainer: {
+    flex: 1,
+    backgroundColor: '#9CA3AF',
+  },
+  zoomView: {
+    flex: 1,
+  },
+  paper: {
+    backgroundColor: '#FFFEF8',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  noteLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#BFDBFE',
+  },
+  titleRow: {
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderBottomWidth: 2,
+    borderBottomColor: '#3B82F6',
+  },
+  titleText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    textAlign: 'center',
+  },
+  keywordMargin: {
+    position: 'absolute',
+    left: 0,
+    top: 80,
+    width: '22%',
+    borderRightWidth: 2,
+    borderRightColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    zIndex: 10,
+  },
+  marginLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  keywordText: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#1F2937',
+  },
+  noteContent: {
+    marginLeft: '23%',
+    paddingTop: 80,
+    paddingHorizontal: 20,
+    paddingBottom: 250,
+    zIndex: 5,
+  },
+  summaryRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: 2,
+    borderTopColor: '#3B82F6',
+    backgroundColor: 'rgba(239, 246, 255, 0.95)',
+    padding: 16,
+    minHeight: 120,
+  },
+  summaryText: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#374151',
+    marginTop: 4,
+  },
+  zoomHint: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  zoomHintText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+})
+
+const cornellMarkdownStyles = StyleSheet.create({
+  body: {
+    fontSize: 18,
+    lineHeight: 30,
+    color: '#374151',
+  },
+  heading2: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginTop: 20,
+    marginBottom: 12,
+    color: '#1F2937',
+  },
+  heading3: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+    color: '#1F2937',
+  },
+  bullet_list: {
+    marginVertical: 8,
+  },
+  list_item: {
+    marginVertical: 4,
+  },
+  strong: {
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginVertical: 12,
+  },
+  th: {
+    padding: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: '#F3F4F6',
+  },
+  td: {
+    padding: 12,
+    fontSize: 16,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },

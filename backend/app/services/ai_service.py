@@ -426,14 +426,24 @@ class AIService:
 - 핵심 내용
 """
             elif method == OrganizeMethod.CORNELL:
-                format_instruction = """[출력 형식]
-# 제목
+                format_instruction = """[출력 형식 - 코넬식]
+===TITLE===
+제목
 
-| 키워드 | 설명 |
-|--------|------|
-| 개념 | 설명 |
+===KEYWORDS===
+- 핵심 키워드/질문 (왼쪽 영역용)
+- 개념명
+- ~이란?
+- ~의 특징은?
 
-**요약**: 1문장
+===NOTES===
+본문 내용 (오른쪽 영역용)
+- 상세 설명
+- 예시
+- 부연 설명
+
+===SUMMARY===
+전체 내용을 1-2문장으로 요약 (하단 영역용)
 """
             else:
                 format_instruction = "글머리표로 정리"
