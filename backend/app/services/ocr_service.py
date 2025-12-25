@@ -442,10 +442,9 @@ class OCRService:
 
             return (text.strip(), metadata) if text else None
 
-        except ImportError:
+        except ImportError as e:
             raise Exception(
-                "Google Cloud Vision 라이브러리가 설치되지 않았습니다. "
-                "pip install google-cloud-vision을 실행하세요."
+                f"Google Cloud Vision import 오류: {str(e)}"
             )
         except Exception as e:
             raise Exception(f"Google Vision OCR 처리 중 오류 발생: {str(e)}")

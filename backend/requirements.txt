@@ -9,3 +9,5 @@ pydantic-settings
 httpx
 passlib[bcrypt]
 python-jose[cryptography]
+google-cloud-vision
+pillow
