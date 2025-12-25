@@ -30,6 +30,8 @@ export interface Note {
   error_message?: string
   thumbnail_url?: string
   image_urls?: string[]  // 원본 이미지 URL 목록
+  detected_subject?: string  // AI 감지 과목
+  detected_note_type?: string  // AI 감지 노트 타입
 }
 
 export interface User {

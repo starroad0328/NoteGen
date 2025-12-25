@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import {
   View,
   Text,
@@ -14,11 +14,15 @@ import Markdown from 'react-native-markdown-display'
 import * as Clipboard from 'expo-clipboard'
 import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view'
 import { notesAPI, Note } from '../../services/api'
+import {
+  CornellCanvas,
+  CornellNoteData,
+  isCornellJson,
+  parseLegacyCornell,
+  convertLegacyToJson
+} from '../../components/cornell'
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
-// 캔버스 크기 (A4 비율 기반, 큰 도화지)
-const CANVAS_WIDTH = SCREEN_WIDTH * 2
-const CANVAS_HEIGHT = SCREEN_HEIGHT * 2.5
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
 
 // 섹션 타입별 스타일
@@ -86,6 +90,174 @@ function parseMarkdownSections(content: string) {
   }
 
   return sections
+}
+
+// 마크다운 테이블 형식 파싱 (기존 코넬식 노트용)
+function parseMarkdownTable(content: string, title: string): CornellNoteData {
+  const lines = content.split('\n')
+  const cues: string[] = []
+  const main: CornellNoteData['main'] = []
+  let summaryText = ''
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // **요약**: 형식 추출
+    if (trimmed.startsWith('**요약**') || trimmed.startsWith('**Summary**')) {
+      const summaryMatch = trimmed.match(/\*\*요약\*\*[:\s]*(.+)/)
+      if (summaryMatch) {
+        summaryText = summaryMatch[1].trim()
+      }
+      continue
+    }
+
+    // 테이블 구분선 스킵
+    if (trimmed.match(/^\|[-:\s|]+\|$/)) {
+      continue
+    }
+
+    // 테이블 행 파싱
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const cells = trimmed.split('|').slice(1, -1).map(c => c.trim())
+      if (cells.length >= 2 && cells[0]) {
+        const keyword = cells[0]
+        const description = cells[1] || ''
+
+        // 헤더행 스킵
+        if (keyword === '키워드' || keyword === '개념' || keyword === '질문' ||
+            keyword === 'Keyword' || keyword === '핵심' || keyword.includes('---')) continue
+
+        cues.push(keyword)
+        main.push({ type: 'important', content: `${keyword}: ${description}` })
+      }
+      continue
+    }
+
+    // 제목
+    if (trimmed.startsWith('## ')) {
+      main.push({ type: 'heading', level: 2, content: trimmed.replace('## ', '') })
+    } else if (trimmed.startsWith('# ')) {
+      // 메인 제목은 스킵 (이미 title로 받음)
+    }
+  }
+
+  return {
+    title: title,
+    cues: cues.length > 0 ? cues : ['내용 정리'],
+    main: main.length > 0 ? main : [{ type: 'paragraph', content: content }],
+    summary: summaryText || extractSummary(content)
+  }
+}
+
+// 요약 추출 (마지막 문단 또는 **요약** 섹션)
+function extractSummary(content: string): string {
+  // **요약** 패턴 찾기
+  const summaryMatch = content.match(/\*\*요약\*\*[:\s]*([\s\S]*?)(?:\n\n|$)/i)
+  if (summaryMatch) {
+    return summaryMatch[1].trim().split('\n')[0]
+  }
+
+  // ## 요약 섹션 찾기
+  const sectionMatch = content.match(/##\s*요약[:\s]*([\s\S]*?)(?:\n##|$)/i)
+  if (sectionMatch) {
+    return sectionMatch[1].trim().split('\n')[0]
+  }
+
+  // 마지막 문단 반환
+  const paragraphs = content.split('\n\n').filter(p => p.trim() && !p.startsWith('#') && !p.includes('|'))
+  if (paragraphs.length > 0) {
+    const last = paragraphs[paragraphs.length - 1].trim()
+    if (last.length < 200) return last
+  }
+
+  return '핵심 내용을 정리한 노트입니다.'
+}
+
+// 코넬식 노트 렌더러 - JSON과 레거시 형식 모두 지원
+function CornellNoteRenderer({
+  content,
+  title,
+  date,
+  subject
+}: {
+  content: string
+  title: string
+  date?: string
+  subject?: string
+}) {
+  const cornellData = useMemo((): CornellNoteData | null => {
+    // 1. JSON 형식 시도
+    if (isCornellJson(content)) {
+      try {
+        return JSON.parse(content) as CornellNoteData
+      } catch {
+        // 파싱 실패시 다음 방법 시도
+      }
+    }
+
+    // 2. 레거시 마커 형식 시도 (===TITLE===, ===KEYWORDS=== 등)
+    const legacy = parseLegacyCornell(content)
+    if (legacy) {
+      return convertLegacyToJson(legacy)
+    }
+
+    // 3. 마크다운 테이블 형식 파싱 (| 키워드 | 설명 | 형태)
+    if (content.includes('|') && content.includes('---')) {
+      return parseMarkdownTable(content, title)
+    }
+
+    // 4. 일반 마크다운 → 간단 변환
+    const lines = content.split('\n').filter(l => l.trim())
+    const cues: string[] = []
+    const main: CornellNoteData['main'] = []
+    let summaryText = ''
+
+    for (const line of lines) {
+      if (line.startsWith('# ')) {
+        // 제목은 스킵 (이미 title prop으로 받음)
+      } else if (line.startsWith('## ')) {
+        const heading = line.replace('## ', '')
+        cues.push(heading)
+        main.push({ type: 'heading', level: 2, content: heading })
+      } else if (line.startsWith('### ')) {
+        main.push({ type: 'heading', level: 3, content: line.replace('### ', '') })
+      } else if (line.startsWith('- ')) {
+        const lastBlock = main[main.length - 1]
+        if (lastBlock?.type === 'bullet') {
+          lastBlock.items.push(line.replace('- ', ''))
+        } else {
+          main.push({ type: 'bullet', items: [line.replace('- ', '')] })
+        }
+      } else if (line.includes('요약') && line.includes(':')) {
+        summaryText = line.split(':').slice(1).join(':').trim()
+      } else if (line.trim()) {
+        main.push({ type: 'paragraph', content: line })
+      }
+    }
+
+    return {
+      title: title,
+      cues: cues.length > 0 ? cues : ['내용 정리'],
+      main: main.length > 0 ? main : [{ type: 'paragraph', content: content }],
+      summary: summaryText || extractSummary(content)
+    }
+  }, [content, title])
+
+  if (!cornellData) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Text>노트를 불러올 수 없습니다.</Text>
+      </View>
+    )
+  }
+
+  return (
+    <CornellCanvas
+      data={cornellData}
+      date={date}
+      subject={subject}
+    />
+  )
 }
 
 export default function NoteScreen() {
@@ -230,94 +402,15 @@ export default function NoteScreen() {
         </TouchableOpacity>
       )}
 
-      {/* 코넬식 노트 레이아웃 - 캔버스 스타일 */}
-      {note.organize_method === 'cornell' ? (() => {
-        // 파싱 로직 - 새 형식 또는 기존 형식
-        const content = note.organized_content || ''
-        const isNewFormat = content.includes('===KEYWORDS===') || content.includes('===NOTES===')
-
-        let keywords = ''
-        let notes = ''
-        let summary = ''
-        let title = note.title
-
-        if (isNewFormat) {
-          // 새 형식: ===MARKER=== 사용
-          const titleMatch = content.match(/===TITLE===\s*([\s\S]*?)(?====|$)/)
-          if (titleMatch) title = titleMatch[1].trim()
-          keywords = content.match(/===KEYWORDS===\s*([\s\S]*?)(?====|$)/)?.[1]?.trim() || ''
-          notes = content.match(/===NOTES===\s*([\s\S]*?)(?====|$)/)?.[1]?.trim() || ''
-          summary = content.match(/===SUMMARY===\s*([\s\S]*?)(?====|$)/)?.[1]?.trim() || ''
-        } else {
-          // 기존 형식: 노트 영역에 전체 내용 표시
-          notes = content
-
-          // 키워드: 헤딩(#, ##)에서 추출
-          const headings = content.match(/^#{1,2}\s+(.+)$/gm)
-          if (headings) {
-            keywords = headings
-              .map(h => h.replace(/^#+\s*/, '').trim())
-              .map(k => `• ${k}`)
-              .join('\n')
-          }
-
-          // 요약: 마지막 문단 또는 **요약** 섹션
-          const summaryMatch = content.match(/(?:\*\*요약\*\*|##?\s*요약)[:\s]*([\s\S]*?)$/i)
-          if (summaryMatch) {
-            summary = summaryMatch[1].trim()
-          }
-        }
-
-        return (
-          <View style={cornellStyles.zoomContainer}>
-            <ReactNativeZoomableView
-              maxZoom={2.5}
-              minZoom={0.4}
-              initialZoom={0.5}
-              bindToBorders={true}
-              contentWidth={CANVAS_WIDTH}
-              contentHeight={CANVAS_HEIGHT}
-              panBoundaryPadding={50}
-              style={cornellStyles.zoomView}
-            >
-              {/* 종이 전체가 노트 */}
-              <View style={[cornellStyles.paper, { width: CANVAS_WIDTH, height: CANVAS_HEIGHT }]}>
-                {/* 줄 노트 라인 */}
-                {[...Array(100)].map((_, i) => (
-                  <View key={`line${i}`} style={[cornellStyles.noteLine, { top: 80 + i * 32 }]} />
-                ))}
-
-                {/* 제목 */}
-                <View style={cornellStyles.titleRow}>
-                  <Text style={cornellStyles.titleText}>{title}</Text>
-                </View>
-
-                {/* 키워드 영역 (왼쪽 여백) */}
-                <View style={cornellStyles.keywordMargin}>
-                  <Text style={cornellStyles.marginLabel}>키워드</Text>
-                  <Text style={cornellStyles.keywordText}>{keywords}</Text>
-                </View>
-
-                {/* 메인 노트 내용 */}
-                <View style={cornellStyles.noteContent}>
-                  <Markdown style={cornellMarkdownStyles}>{notes}</Markdown>
-                </View>
-
-                {/* 요약 (하단) */}
-                <View style={cornellStyles.summaryRow}>
-                  <Text style={cornellStyles.marginLabel}>요약</Text>
-                  <Text style={cornellStyles.summaryText}>{summary}</Text>
-                </View>
-              </View>
-            </ReactNativeZoomableView>
-
-            {/* 줌 안내 */}
-            <View style={cornellStyles.zoomHint}>
-              <Text style={cornellStyles.zoomHintText}>🔍 핀치로 확대/축소</Text>
-            </View>
-          </View>
-        )
-      })() : (
+      {/* 코넬식 노트 레이아웃 - 새 캔버스 컴포넌트 */}
+      {note.organize_method === 'cornell' ? (
+        <CornellNoteRenderer
+          content={note.organized_content || ''}
+          title={note.title}
+          date={new Date(note.created_at).toLocaleDateString('ko-KR')}
+          subject={note.detected_subject}
+        />
+      ) : (
         /* 기본 레이아웃 */
         <ScrollView
           ref={contentScrollRef}
@@ -464,155 +557,6 @@ const markdownStyles = StyleSheet.create({
   },
   td: {
     padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-})
-
-// 코넬식 노트 스타일 - 종이 한 장
-const cornellStyles = StyleSheet.create({
-  zoomContainer: {
-    flex: 1,
-    backgroundColor: '#9CA3AF',
-  },
-  zoomView: {
-    flex: 1,
-  },
-  paper: {
-    backgroundColor: '#FFFEF8',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  noteLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: '#BFDBFE',
-  },
-  titleRow: {
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: '#3B82F6',
-  },
-  titleText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E3A8A',
-    textAlign: 'center',
-  },
-  keywordMargin: {
-    position: 'absolute',
-    left: 0,
-    top: 80,
-    width: '22%',
-    borderRightWidth: 2,
-    borderRightColor: '#EF4444',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    zIndex: 10,
-  },
-  marginLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    marginBottom: 8,
-  },
-  keywordText: {
-    fontSize: 16,
-    lineHeight: 26,
-    color: '#1F2937',
-  },
-  noteContent: {
-    marginLeft: '23%',
-    paddingTop: 80,
-    paddingHorizontal: 20,
-    paddingBottom: 250,
-    zIndex: 5,
-  },
-  summaryRow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopWidth: 2,
-    borderTopColor: '#3B82F6',
-    backgroundColor: 'rgba(239, 246, 255, 0.95)',
-    padding: 16,
-    minHeight: 120,
-  },
-  summaryText: {
-    fontSize: 16,
-    lineHeight: 26,
-    color: '#374151',
-    marginTop: 4,
-  },
-  zoomHint: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  zoomHintText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-})
-
-const cornellMarkdownStyles = StyleSheet.create({
-  body: {
-    fontSize: 18,
-    lineHeight: 30,
-    color: '#374151',
-  },
-  heading2: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 12,
-    color: '#1F2937',
-  },
-  heading3: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-    color: '#1F2937',
-  },
-  bullet_list: {
-    marginVertical: 8,
-  },
-  list_item: {
-    marginVertical: 4,
-  },
-  strong: {
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  table: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    marginVertical: 12,
-  },
-  th: {
-    padding: 12,
-    fontSize: 16,
-    fontWeight: '600',
-    backgroundColor: '#F3F4F6',
-  },
-  td: {
-    padding: 12,
-    fontSize: 16,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },

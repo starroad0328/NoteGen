@@ -2,7 +2,7 @@
  2025-12-25 (수) 개발 일지
 ═══════════════════════════════════════════════════════════════
 
-주제: 코넬식 노트 UI 개선 (줌 캔버스)
+주제: 코넬식 노트 UI 개선 (줌 캔버스 + JSON 구조화)
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -11,25 +11,37 @@
 
 1. 코넬식 노트 레이아웃 전면 개편
    - 기존: 단순 마크다운 렌더링
-   - 변경: 큰 종이(도화지) 형태의 캔버스
-   - 핀치 줌으로 확대/축소 가능
+   - 변경: Google Docs 스타일의 "pageless" 캔버스
+   - 핀치 줌으로 확대/축소 + 자유 이동
 
-2. 줌 기능 구현
-   - @openspacelabs/react-native-zoomable-view 라이브러리 사용
-   - 캔버스 크기: 화면의 2배 너비, 2.5배 높이
-   - 줌 범위: 0.4x ~ 2.5x
-   - 경계 제한 (bindToBorders)으로 캔버스 밖으로 이동 방지
+2. AI 출력 JSON 구조화
+   - 기존: 마커 형식 (===TITLE===, ===KEYWORDS===)
+   - 변경: JSON 형식으로 구조화된 출력
+   {
+     "title": "제목",
+     "cues": ["키워드1", "키워드2"],
+     "main": [블록 배열],
+     "summary": "요약"
+   }
 
-3. 코넬 노트 형식 파싱
-   - 새 형식: ===TITLE===, ===KEYWORDS===, ===NOTES===, ===SUMMARY=== 마커
-   - 기존 형식: 헤딩에서 키워드 추출, **요약** 섹션 추출
-   - 노트 영역에 전체 정리 내용 표시
+3. 컴포넌트 분리 (mobile/components/cornell/)
+   - types.ts: 타입 정의 + 유틸리티 함수
+   - CornellCanvas.tsx: 줌 가능한 메인 캔버스
+   - MainContentBlock.tsx: 본문 블록 렌더러
 
-4. 종이 스타일 UI
-   - 줄 노트 라인 (가로선)
-   - 왼쪽 빨간 여백선 (키워드 영역)
-   - 하단 요약 영역
-   - 상단 제목 영역
+4. 줌/이동 동작 개선
+   - bindToBorders: false (중앙으로 스냅되지 않음)
+   - panBoundaryPadding: 200 (화면 밖으로 완전히 나가지 않게)
+   - 줌 범위: 0.3x ~ 2x, 초기 0.5x
+
+5. 키워드 형식 개선
+   - 기존: 문장/질문 형태 ("~란?", "~의 특징은?")
+   - 변경: 암기용 단어/용어만 ("발해", "대조영", "3성6부")
+
+6. 노트 재처리 API 추가
+   - POST /api/process/{note_id}/reprocess
+   - OCR 스킵, AI만 다시 실행
+   - 기존 노트에 새 프롬프트 적용 가능
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -37,45 +49,59 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Mobile:
-  - mobile/app/notes/[id].tsx (코넬 노트 줌 캔버스 레이아웃)
-  - package.json (@openspacelabs/react-native-zoomable-view 추가)
+  - mobile/app/notes/[id].tsx (CornellNoteRenderer 추가)
+  - mobile/services/api.ts (detected_subject, detected_note_type 추가)
+  - mobile/components/cornell/types.ts (새 파일)
+  - mobile/components/cornell/CornellCanvas.tsx (새 파일)
+  - mobile/components/cornell/MainContentBlock.tsx (새 파일)
+  - mobile/components/cornell/index.ts (새 파일)
 
 Backend:
-  - backend/app/services/ai_service.py (코넬식 프롬프트에 마커 형식 추가)
+  - backend/app/services/ai_service.py (코넬식 JSON 프롬프트)
+  - backend/app/api/process.py (reprocess 엔드포인트 추가)
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  기술 노트
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-코넬식 프롬프트 출력 형식:
-  ===TITLE===
-  제목
-
-  ===KEYWORDS===
-  - 키워드 목록
-
-  ===NOTES===
-  본문 내용
-
-  ===SUMMARY===
-  요약
+코넬식 JSON 형식:
+  {
+    "title": "제목",
+    "cues": ["키워드1", "키워드2", ...],
+    "main": [
+      {"type": "heading", "level": 2, "content": "소제목"},
+      {"type": "paragraph", "content": "설명"},
+      {"type": "bullet", "items": ["항목1", "항목2"]},
+      {"type": "important", "content": "중요 내용"},
+      {"type": "example", "content": "예시"}
+    ],
+    "summary": "요약"
+  }
 
 줌 설정:
   - initialZoom: 0.5 (전체 보기)
-  - maxZoom: 2.5
-  - minZoom: 0.4
-  - bindToBorders: true (경계 제한)
-  - panBoundaryPadding: 50 (여유 공간)
+  - maxZoom: 2
+  - minZoom: 0.3
+  - bindToBorders: false
+  - panBoundaryPadding: 200
+
+레거시 호환:
+  - 마커 형식 (===TITLE===) 지원
+  - 마크다운 테이블 형식 지원
+  - JSON 파싱 실패 시 폴백 처리
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 진행 중 / 다음 작업
+ 완료된 작업
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-- 코넬 노트 키워드/요약 파싱 개선 (기존 노트 호환성)
-- 월간 사용량 제한 (10회/월)
-- 앱 스토어 에셋 준비
+✅ 코넬식 캔버스 레이아웃 구현
+✅ AI 출력 JSON 구조화
+✅ 컴포넌트 분리 (cornell/ 폴더)
+✅ 줌/이동 동작 개선 (스냅 제거)
+✅ 키워드 암기용 단어 형식으로 변경
+✅ 노트 재처리 API 추가
 
 
 ═══════════════════════════════════════════════════════════════

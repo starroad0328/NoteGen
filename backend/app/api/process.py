@@ -188,6 +188,83 @@ async def process_note(
     )
 
 
+@router.post("/{note_id}/reprocess", response_model=ProcessResponse)
+async def reprocess_note(
+    note_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    노트 AI 재처리 (OCR 스킵, AI만 다시 실행)
+    """
+    note = db.query(Note).filter(Note.id == note_id).first()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+
+    if not note.ocr_text:
+        raise HTTPException(status_code=400, detail="OCR 텍스트가 없습니다. 전체 재처리가 필요합니다.")
+
+    # AI만 다시 실행
+    note.status = ProcessStatus.AI_ORGANIZING
+    db.commit()
+
+    try:
+        # 사용자 학년 정보 조회
+        user = None
+        school_level = None
+        grade = None
+        if note.user_id:
+            user = db.query(User).filter(User.id == note.user_id).first()
+            if user:
+                school_level = user.school_level
+                grade = user.grade
+
+        # OCR 메타데이터 파싱
+        ocr_metadata = None
+        if note.ocr_metadata:
+            ocr_metadata = json.loads(note.ocr_metadata)
+
+        result = await ai_service.organize_note(
+            ocr_text=note.ocr_text,
+            method=note.organize_method,
+            ocr_metadata=ocr_metadata,
+            school_level=school_level,
+            grade=grade
+        )
+
+        # 결과 저장
+        organized_content = result.get("content", "")
+        detected_subject_str = result.get("detected_subject", "other")
+        detected_note_type_str = result.get("detected_note_type", "general")
+
+        try:
+            note.detected_subject = Subject(detected_subject_str)
+        except ValueError:
+            note.detected_subject = Subject.OTHER
+
+        try:
+            note.detected_note_type = NoteType(detected_note_type_str)
+        except ValueError:
+            note.detected_note_type = NoteType.GENERAL
+
+        note.organized_content = organized_content
+        note.status = ProcessStatus.COMPLETED
+        db.commit()
+
+        return ProcessResponse(
+            note_id=note.id,
+            status=note.status,
+            message="AI 재처리 완료",
+            organized_content=note.organized_content
+        )
+
+    except Exception as e:
+        note.status = ProcessStatus.FAILED
+        note.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"AI 재처리 실패: {str(e)}")
+
+
 @router.get("/{note_id}/status", response_model=ProcessResponse)
 async def get_process_status(
     note_id: int,
@@ -219,3 +296,4 @@ async def get_process_status(
         organized_content=note.organized_content if note.status == ProcessStatus.COMPLETED else None,
         error_message=note.error_message if note.status == ProcessStatus.FAILED else None
     )
+

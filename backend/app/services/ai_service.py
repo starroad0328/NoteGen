@@ -426,24 +426,40 @@ class AIService:
 - 핵심 내용
 """
             elif method == OrganizeMethod.CORNELL:
-                format_instruction = """[출력 형식 - 코넬식]
-===TITLE===
-제목
+                format_instruction = """[출력 형식 - 코넬식 JSON]
+반드시 아래 JSON 형식으로만 출력하세요. 다른 텍스트 없이 JSON만 출력.
 
-===KEYWORDS===
-- 핵심 키워드/질문 (왼쪽 영역용)
-- 개념명
-- ~이란?
-- ~의 특징은?
+```json
+{
+  "title": "제목 (내용 기반 자동 생성)",
+  "cues": [
+    "키워드1",
+    "키워드2",
+    "핵심용어"
+  ],
+  "main": [
+    {"type": "heading", "level": 2, "content": "소제목"},
+    {"type": "paragraph", "content": "설명 텍스트"},
+    {"type": "bullet", "items": ["항목1", "항목2", "항목3"]},
+    {"type": "important", "content": "중요 개념 강조"},
+    {"type": "example", "content": "예시 내용"}
+  ],
+  "summary": "전체 내용을 1-2문장으로 압축한 요약 (하단 영역)"
+}
+```
 
-===NOTES===
-본문 내용 (오른쪽 영역용)
-- 상세 설명
-- 예시
-- 부연 설명
+[main 배열 타입 설명]
+- heading: 소제목 (level: 2 또는 3)
+- paragraph: 일반 텍스트 설명
+- bullet: 글머리표 목록 (items 배열)
+- important: 중요 개념 (강조 표시용)
+- example: 예시 (별도 스타일 적용용)
 
-===SUMMARY===
-전체 내용을 1-2문장으로 요약 (하단 영역용)
+[규칙]
+- cues는 암기용 핵심 키워드/용어만 (5-10개)
+  문장이나 질문 형태 X, 단어/용어 형태로만
+- main은 논리적 순서로 구성
+- 마크다운 문법 사용하지 말 것 (JSON 구조로 표현)
 """
             else:
                 format_instruction = "글머리표로 정리"
@@ -496,7 +512,36 @@ class AIService:
                 raise Exception("토큰 한도 초과: max_completion_tokens를 늘려야 합니다.")
             raise Exception(f"AI가 빈 응답을 반환했습니다. (finish_reason: {response.choices[0].finish_reason})")
 
-        return result.strip()
+        result = result.strip()
+
+        # 코넬식일 때 JSON 블록 추출 및 검증
+        if method == OrganizeMethod.CORNELL:
+            result = self._extract_cornell_json(result)
+
+        return result
+
+    def _extract_cornell_json(self, result: str) -> str:
+        """코넬식 JSON 응답에서 JSON 블록 추출 및 검증"""
+        json_str = result
+
+        # ```json ... ``` 블록 추출
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0].strip()
+
+        # JSON 검증
+        try:
+            parsed = json.loads(json_str)
+            # 필수 필드 확인
+            if not all(key in parsed for key in ["title", "cues", "main", "summary"]):
+                print("[AI] 코넬식 JSON 필수 필드 누락, 원본 반환", flush=True)
+                return result
+            # 검증된 JSON 문자열 반환
+            return json.dumps(parsed, ensure_ascii=False)
+        except json.JSONDecodeError as e:
+            print(f"[AI] 코넬식 JSON 파싱 실패: {e}, 원본 반환", flush=True)
+            return result
 
 
 # 싱글톤 인스턴스
