@@ -61,8 +61,8 @@ export default function HomeTab() {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.heroEmoji}>📝</Text>
-        <Text style={styles.heroTitle}>NoteGen</Text>
-        <Text style={styles.heroSubtitle}>AI가 필기를 정리해드려요</Text>
+        <Text style={styles.heroTitle}>NotioClass</Text>
+        <Text style={styles.heroSubtitle}>Upload your notes. Study with them.</Text>
 
         <View style={styles.featureList}>
           <Text style={styles.featureItem}>사진 찍으면 자동 정리</Text>
@@ -181,14 +181,26 @@ export default function HomeTab() {
   )
 }
 
+// NotioClass 브랜드 컬러
+const COLORS = {
+  background: '#FDF6E3',      // 따뜻한 크림색
+  primary: '#C4956A',         // 갈색 메인
+  primaryDark: '#A67B5B',     // 진한 갈색
+  accent: '#E8B866',          // 골드/오렌지
+  text: '#5D4E37',            // 갈색 텍스트
+  textLight: '#8B7355',       // 연한 갈색
+  cardBg: '#FFFEF8',          // 카드 배경
+  white: '#FFFFFF',
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
+    backgroundColor: COLORS.background,
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
@@ -199,7 +211,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: COLORS.textLight,
   },
 
   // 비로그인 히어로
@@ -210,12 +222,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.text,
     marginBottom: 8,
   },
   heroSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: COLORS.textLight,
     marginBottom: 32,
   },
   featureList: {
@@ -223,12 +235,12 @@ const styles = StyleSheet.create({
   },
   featureItem: {
     fontSize: 15,
-    color: '#555',
+    color: COLORS.textLight,
     marginBottom: 8,
     textAlign: 'center',
   },
   loginButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 64,
     paddingVertical: 16,
     borderRadius: 12,
@@ -243,7 +255,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   registerLinkText: {
-    color: '#3B82F6',
+    color: COLORS.primary,
     fontSize: 14,
   },
 
@@ -257,22 +269,22 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.text,
   },
   gradeText: {
     fontSize: 14,
-    color: '#10B981',
+    color: COLORS.primary,
     fontWeight: '500',
     marginTop: 2,
   },
   usagePill: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   usagePillWarning: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: COLORS.accent,
   },
   usagePillText: {
     color: 'white',
@@ -282,13 +294,13 @@ const styles = StyleSheet.create({
 
   // 메인 CTA
   mainCTA: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#3B82F6',
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -325,13 +337,13 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.cardBg,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -341,7 +353,7 @@ const styles = StyleSheet.create({
   },
   quickActionText: {
     fontSize: 13,
-    color: '#555',
+    color: COLORS.text,
     fontWeight: '500',
   },
 
@@ -358,22 +370,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.text,
   },
   sectionMore: {
     fontSize: 14,
-    color: '#3B82F6',
+    color: COLORS.primary,
   },
 
   // 노트 카드
   noteCard: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.cardBg,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    shadowColor: '#000',
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -385,16 +397,16 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#333',
+    color: COLORS.text,
     marginBottom: 2,
   },
   noteDate: {
     fontSize: 12,
-    color: '#999',
+    color: COLORS.textLight,
   },
   noteArrow: {
     fontSize: 20,
-    color: '#CCC',
+    color: COLORS.primary,
   },
 
   // 빈 상태
@@ -409,11 +421,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#666',
+    color: COLORS.text,
     marginBottom: 4,
   },
   emptyDesc: {
     fontSize: 14,
-    color: '#999',
+    color: COLORS.textLight,
   },
 })
