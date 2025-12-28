@@ -747,9 +747,8 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   solutionAnswer: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#059669',
+    fontSize: 16,
+    color: '#374151',
     lineHeight: 26,
   },
   stepsContainer: {
@@ -775,10 +774,9 @@ const styles = StyleSheet.create({
   },
   solutionExplanation: {
     fontSize: 15,
-    color: '#6B7280',
+    color: '#374151',
     lineHeight: 24,
     marginTop: 12,
-    fontStyle: 'italic',
   },
 
   // 틀린 포인트 블록
@@ -790,7 +788,7 @@ const styles = StyleSheet.create({
   },
   myAnswerText: {
     fontSize: 16,
-    color: '#DC2626',
+    color: '#374151',
     lineHeight: 26,
   },
   reasonText: {
@@ -800,7 +798,7 @@ const styles = StyleSheet.create({
   },
   correctionText: {
     fontSize: 16,
-    color: '#059669',
+    color: '#374151',
     lineHeight: 26,
   },
 
@@ -811,7 +809,7 @@ const styles = StyleSheet.create({
   conceptTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4338CA',
+    color: '#374151',
     marginBottom: 8,
   },
   conceptContent: {
@@ -824,7 +822,7 @@ const styles = StyleSheet.create({
   },
   relatedFormula: {
     fontSize: 15,
-    color: '#4338CA',
+    color: '#374151',
     fontFamily: 'monospace',
     marginBottom: 4,
   },
