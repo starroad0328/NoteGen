@@ -1,226 +1,181 @@
 /**
- * 필기 정리 탭 (메인 + 업로드)
+ * 홈 탭
+ * 최근 정리 + 다음 행동 CTA
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Alert } from 'react-native'
+import { useState, useCallback } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
-import * as ImagePicker from 'expo-image-picker'
-import { uploadAPI, authAPI, UsageInfo } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { notesAPI, authAPI, Note, UsageInfo } from '../../services/api'
 
 export default function HomeTab() {
   const router = useRouter()
-  const { user, token, loading } = useAuth()
-  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
-  const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'error_note' | 'vocab'>('basic_summary')
-  const [uploading, setUploading] = useState(false)
+  const { user, token, loading: authLoading } = useAuth()
+  const [recentNotes, setRecentNotes] = useState<Note[]>([])
   const [usage, setUsage] = useState<UsageInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // 탭 포커스될 때마다 사용량 새로고침
+  const fetchData = async () => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+    try {
+      const [notes, usageData] = await Promise.all([
+        notesAPI.list(0, 3, token),
+        authAPI.getUsage(token)
+      ])
+      setRecentNotes(notes.filter(n => n.status === 'completed'))
+      setUsage(usageData)
+    } catch (error) {
+      console.error('데이터 로드 실패:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useFocusEffect(
     useCallback(() => {
-      if (token) {
-        authAPI.getUsage(token).then(setUsage).catch(console.error)
-      }
+      fetchData()
     }, [token])
   )
 
-  const takePhoto = async () => {
-    if (!user) {
-      Alert.alert('로그인 필요', '필기 정리 기능을 사용하려면 로그인이 필요합니다.', [
-        { text: '취소', style: 'cancel' },
-        { text: '로그인', onPress: () => router.push('/login') }
-      ])
-      return
-    }
-    const permission = await ImagePicker.requestCameraPermissionsAsync()
-    if (!permission.granted) { Alert.alert('권한 필요', '카메라 사용 권한이 필요합니다.'); return }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
-    if (!result.canceled && result.assets) {
-      if (images.length >= 3) { Alert.alert('제한', '최대 3개까지'); return }
-      setImages([...images, ...result.assets])
-    }
-  }
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchData()
+    setRefreshing(false)
+  }, [token])
 
-  const pickImage = async () => {
-    if (!user) {
-      Alert.alert('로그인 필요', '필기 정리 기능을 사용하려면 로그인이 필요합니다.', [
-        { text: '취소', style: 'cancel' },
-        { text: '로그인', onPress: () => router.push('/login') }
-      ])
-      return
-    }
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!permission.granted) { Alert.alert('권한 필요', '갤러리 접근 권한이 필요합니다.'); return }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8,
-      selectionLimit: 3 - images.length
-    })
-    if (!result.canceled && result.assets) { setImages([...images, ...result.assets]) }
-  }
-
-  const removeImage = (index: number) => { setImages(images.filter((_, i) => i !== index)) }
-
-  const handleUpload = async () => {
-    if (images.length === 0) { Alert.alert('알림', '이미지를 선택해주세요.'); return }
-    if (!user || !token) {
-      Alert.alert('로그인 필요', '필기 정리 기능을 사용하려면 로그인이 필요합니다.')
-      return
-    }
-    setUploading(true)
-    try {
-      const imageData = images.map((image, index) => ({ uri: image.uri, type: 'image/jpeg', name: 'image_' + index + '.jpg' }))
-      const uploadResult = await uploadAPI.uploadImages(imageData, organizeMethod, token)
-      setImages([]) // 업로드 후 초기화
-      router.push('/processing/' + uploadResult.id)
-    } catch (error: any) {
-      // 사용량 초과 에러 (429)
-      if (error.response?.status === 429) {
-        const detail = error.response?.data?.detail
-        Alert.alert(
-          '사용량 초과',
-          detail?.message || '이번 달 무료 사용량을 모두 사용했습니다.',
-          [
-            { text: '닫기', style: 'cancel' },
-            { text: '플랜 보기', onPress: () => router.push('/(tabs)/plan') }
-          ]
-        )
-      } else {
-        const errorMessage = typeof error.response?.data?.detail === 'string'
-          ? error.response.data.detail
-          : error.message || '업로드 중 오류가 발생했습니다.'
-        Alert.alert('오류', errorMessage)
-      }
-    } finally { setUploading(false) }
-  }
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.centerContainer}>
         <Text style={styles.loadingText}>로딩 중...</Text>
       </View>
     )
   }
 
+  // 비로그인 상태
+  if (!user) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.heroEmoji}>📝</Text>
+        <Text style={styles.heroTitle}>NoteGen</Text>
+        <Text style={styles.heroSubtitle}>AI가 필기를 정리해드려요</Text>
+
+        <View style={styles.featureList}>
+          <Text style={styles.featureItem}>사진 찍으면 자동 정리</Text>
+          <Text style={styles.featureItem}>코넬식, 오답노트, 단어장</Text>
+          <Text style={styles.featureItem}>시험 대비 문제 자동 생성</Text>
+        </View>
+
+        <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
+          <Text style={styles.loginButtonText}>시작하기</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.registerLink} onPress={() => router.push('/register')}>
+          <Text style={styles.registerLinkText}>계정이 없으신가요? 회원가입</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.content}>
         {/* 헤더 */}
         <View style={styles.header}>
-          <Text style={styles.logo}>📝</Text>
-          <Text style={styles.title}>필기 정리</Text>
-          <View style={styles.badgeRow}>
-            {user?.grade_display && (
-              <View style={styles.gradeBadge}>
-                <Text style={styles.gradeBadgeText}>{user.grade_display}</Text>
-              </View>
-            )}
-            {usage && !usage.is_unlimited && (
-              <TouchableOpacity
-                style={[styles.usageBadge, usage.remaining === 0 && styles.usageBadgeDanger]}
-                onPress={() => router.push('/(tabs)/plan')}
-              >
-                <Text style={styles.usageBadgeText}>
-                  {usage.used}/{usage.limit}회
-                </Text>
-              </TouchableOpacity>
+          <View>
+            <Text style={styles.greeting}>안녕하세요, {user.name || '학생'}님</Text>
+            {user.grade_display && (
+              <Text style={styles.gradeText}>{user.grade_display}</Text>
             )}
           </View>
-        </View>
-
-        {!user && (
-          <TouchableOpacity style={styles.loginBanner} onPress={() => router.push('/login')}>
-            <Text style={styles.loginBannerText}>로그인하고 필기 정리 시작하기</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* 이미지 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>이미지 선택</Text>
-          <View style={styles.imageButtons}>
-            <TouchableOpacity style={styles.imageButton} onPress={takePhoto}>
-              <Text style={styles.imageButtonIcon}>📸</Text>
-              <Text style={styles.imageButtonText}>사진 촬영</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-              <Text style={styles.imageButtonIcon}>🖼️</Text>
-              <Text style={styles.imageButtonText}>갤러리</Text>
-            </TouchableOpacity>
-          </View>
-
-          {images.length > 0 && (
-            <View style={styles.imageList}>
-              {images.map((image, index) => (
-                <View key={index} style={styles.imageItem}>
-                  <Image source={{ uri: image.uri }} style={styles.thumbnail} />
-                  <TouchableOpacity onPress={() => removeImage(index)} style={styles.removeButton}>
-                    <Text style={styles.removeButtonText}>X</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+          {usage && !usage.is_unlimited && (
+            <View style={[styles.usagePill, usage.remaining <= 3 && styles.usagePillWarning]}>
+              <Text style={styles.usagePillText}>{usage.remaining}회 남음</Text>
             </View>
           )}
-          <Text style={styles.hint}>최대 3개 ({images.length}/3)</Text>
         </View>
 
-        {/* 정리 방식 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>정리 방식</Text>
-          <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'basic_summary' && styles.methodCardSelected]}
-            onPress={() => setOrganizeMethod('basic_summary')}
-          >
-            <Text style={styles.methodIcon}>📋</Text>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>기본 요약 정리</Text>
-              <Text style={styles.methodDesc}>핵심 내용을 간결하게 정리</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'cornell' && styles.methodCardSelected]}
-            onPress={() => setOrganizeMethod('cornell')}
-          >
-            <Text style={styles.methodIcon}>📐</Text>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>코넬식 정리</Text>
-              <Text style={styles.methodDesc}>키워드 + 본문 + 요약 구조</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'error_note' && styles.methodCardSelected]}
-            onPress={() => setOrganizeMethod('error_note')}
-          >
-            <Text style={styles.methodIcon}>❌</Text>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>오답노트</Text>
-              <Text style={styles.methodDesc}>문제 + 오답 + 정답 + 해설</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'vocab' && styles.methodCardSelected]}
-            onPress={() => setOrganizeMethod('vocab')}
-          >
-            <Text style={styles.methodIcon}>📚</Text>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>단어장</Text>
-              <Text style={styles.methodDesc}>단어 + 뜻 + 예문 표 정리</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* 정리 시작 버튼 */}
+        {/* 메인 CTA */}
         <TouchableOpacity
-          style={[styles.uploadButton, (uploading || images.length === 0) && styles.uploadButtonDisabled]}
-          onPress={handleUpload}
-          disabled={uploading || images.length === 0}
+          style={styles.mainCTA}
+          onPress={() => router.push('/(tabs)/upload')}
         >
-          <Text style={styles.uploadButtonText}>
-            {uploading ? '정리 중...' : '정리 시작하기'}
-          </Text>
+          <Text style={styles.mainCTAIcon}>📸</Text>
+          <View style={styles.mainCTAText}>
+            <Text style={styles.mainCTATitle}>필기 정리하기</Text>
+            <Text style={styles.mainCTADesc}>사진 찍고 AI로 정리받기</Text>
+          </View>
+          <Text style={styles.mainCTAArrow}>›</Text>
         </TouchableOpacity>
+
+        {/* 빠른 액션 */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={() => router.push('/(tabs)/notes')}
+          >
+            <Text style={styles.quickActionIcon}>📚</Text>
+            <Text style={styles.quickActionText}>내 노트</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={() => router.push('/(tabs)/practice')}
+          >
+            <Text style={styles.quickActionIcon}>🧠</Text>
+            <Text style={styles.quickActionText}>문제 풀기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={() => router.push('/(tabs)/my')}
+          >
+            <Text style={styles.quickActionIcon}>💎</Text>
+            <Text style={styles.quickActionText}>내 플랜</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 최근 정리 */}
+        {recentNotes.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>최근 정리</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/notes')}>
+                <Text style={styles.sectionMore}>전체보기</Text>
+              </TouchableOpacity>
+            </View>
+            {recentNotes.map((note) => (
+              <TouchableOpacity
+                key={note.id}
+                style={styles.noteCard}
+                onPress={() => router.push(`/notes/${note.id}`)}
+              >
+                <View style={styles.noteInfo}>
+                  <Text style={styles.noteTitle} numberOfLines={1}>{note.title}</Text>
+                  <Text style={styles.noteDate}>
+                    {new Date(note.created_at).toLocaleDateString('ko-KR')}
+                  </Text>
+                </View>
+                <Text style={styles.noteArrow}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* 빈 상태 */}
+        {recentNotes.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>📝</Text>
+            <Text style={styles.emptyTitle}>아직 정리한 노트가 없어요</Text>
+            <Text style={styles.emptyDesc}>첫 필기를 정리해보세요!</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   )
@@ -231,183 +186,234 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFEF8',
   },
+  centerContainer: {
+    flex: 1,
+    backgroundColor: '#FFFEF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
   content: {
     padding: 20,
     paddingTop: 60,
   },
   loadingText: {
-    textAlign: 'center',
-    marginTop: 100,
+    fontSize: 16,
     color: '#666',
   },
+
+  // 비로그인 히어로
+  heroEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 32,
+  },
+  featureList: {
+    marginBottom: 32,
+  },
+  featureItem: {
+    fontSize: 15,
+    color: '#555',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loginButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 64,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  registerLink: {
+    padding: 8,
+  },
+  registerLinkText: {
+    color: '#3B82F6',
+    fontSize: 14,
+  },
+
+  // 헤더
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
   },
-  logo: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 28,
+  greeting: {
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#2C2C2C',
-    marginBottom: 8,
+    color: '#333',
   },
-  badgeRow: {
+  gradeText: {
+    fontSize: 14,
+    color: '#10B981',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  usagePill: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  usagePillWarning: {
+    backgroundColor: '#F59E0B',
+  },
+  usagePillText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // 메인 CTA
+  mainCTA: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 16,
+    padding: 20,
     flexDirection: 'row',
-    gap: 8,
-  },
-  gradeBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  gradeBadgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  usageBadge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  usageBadgeDanger: {
-    backgroundColor: '#EF4444',
-  },
-  usageBadgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  loginBanner: {
-    backgroundColor: '#3B82F6',
-    padding: 16,
-    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 20,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  loginBannerText: {
+  mainCTAIcon: {
+    fontSize: 36,
+    marginRight: 16,
+  },
+  mainCTAText: {
+    flex: 1,
+  },
+  mainCTATitle: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 2,
   },
-  section: {
+  mainCTADesc: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+  },
+  mainCTAArrow: {
+    color: 'white',
+    fontSize: 28,
+    fontWeight: '300',
+  },
+
+  // 빠른 액션
+  quickActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  quickAction: {
+    flex: 1,
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+  quickActionIcon: {
+    fontSize: 24,
+    marginBottom: 6,
   },
-  imageButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  imageButton: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  imageButtonIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  imageButtonText: {
-    fontSize: 14,
-    color: '#333',
+  quickActionText: {
+    fontSize: 13,
+    color: '#555',
     fontWeight: '500',
   },
-  imageList: {
+
+  // 섹션
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  imageItem: {
-    position: 'relative',
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  removeButton: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#EF4444',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 12,
   },
-  removeButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 8,
-  },
-  methodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-  },
-  methodCardSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
-  },
-  methodIcon: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  methodInfo: {
-    flex: 1,
-  },
-  methodTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  methodDesc: {
-    fontSize: 12,
-    color: '#666',
-  },
-  uploadButton: {
-    backgroundColor: '#3B82F6',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  uploadButtonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  uploadButtonText: {
-    color: 'white',
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#333',
+  },
+  sectionMore: {
+    fontSize: 14,
+    color: '#3B82F6',
+  },
+
+  // 노트 카드
+  noteCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  noteInfo: {
+    flex: 1,
+  },
+  noteTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  noteDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  noteArrow: {
+    fontSize: 20,
+    color: '#CCC',
+  },
+
+  // 빈 상태
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+    marginBottom: 4,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    color: '#999',
   },
 })
