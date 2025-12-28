@@ -9,12 +9,12 @@ const path = require('path');
 
 const ASSETS_DIR = path.join(__dirname, '../assets');
 
-// 색상 정의
+// 색상 정의 (NotioClass 브랜딩)
 const COLORS = {
-  background: '#FFFEF8',  // 크림색 배경
-  primary: '#3B82F6',     // 파란색
-  text: '#2C2C2C',        // 텍스트
-  accent: '#10B981',      // 민트
+  background: '#FDF6E3',  // 따뜻한 크림색 배경
+  primary: '#C4956A',     // 갈색 (NotioClass 메인 컬러)
+  text: '#5D4E37',        // 갈색 텍스트
+  accent: '#E8D5B7',      // 밝은 베이지
 };
 
 // 이모지를 텍스트로 그리기 (시스템 폰트 사용)
@@ -233,11 +233,11 @@ function generateSplash() {
   ctx.font = 'bold 72px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = COLORS.text;
-  ctx.fillText('NoteGen', centerX, centerY + radius + 120);
+  ctx.fillText('NotioClass', centerX, centerY + radius + 120);
 
   // 태그라인
   ctx.font = '36px "Segoe UI", Arial, sans-serif';
-  ctx.fillStyle = '#666666';
+  ctx.fillStyle = '#8B7355';
   ctx.fillText('AI가 필기를 정리해드려요', centerX, centerY + radius + 180);
 
   // 저장
