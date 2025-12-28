@@ -116,6 +116,13 @@ export interface DividerBlock extends BaseBlock {
   type: 'divider';
 }
 
+// 단순 섹션 블록 (오답노트용 - 라벨 + 내용 + 구분선)
+export interface SimpleSectionBlock extends BaseBlock {
+  type: 'simpleSection';
+  label: string;
+  content: string;
+}
+
 // ============================================
 // 오답노트용 블록
 // ============================================
@@ -184,6 +191,7 @@ export type NoteBlock =
   | DefinitionBlock
   | TipBlock
   | DividerBlock
+  | SimpleSectionBlock
   // 오답노트
   | ProblemBlock
   | SolutionBlock

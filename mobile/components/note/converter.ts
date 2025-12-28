@@ -337,7 +337,8 @@ function convertWrongAnswerMarkdownToNoteData(
   // 핵심 공식 블록
   if (sections.formula.length > 0) {
     blocks.push({
-      type: 'formula',
+      type: 'simpleSection',
+      label: '핵심 공식',
       content: sections.formula.filter(s => s).join('\n'),
     } as any);
   }
@@ -345,9 +346,9 @@ function convertWrongAnswerMarkdownToNoteData(
   // 주의점 블록
   if (sections.caution.length > 0) {
     blocks.push({
-      type: 'tip',
+      type: 'simpleSection',
+      label: '주의점',
       content: sections.caution.filter(s => s).join('\n'),
-      variant: 'warning',
     } as any);
   }
 

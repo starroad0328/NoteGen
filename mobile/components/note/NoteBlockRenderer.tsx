@@ -19,6 +19,7 @@ import {
   FormulaBlock,
   DefinitionBlock,
   TipBlock,
+  SimpleSectionBlock,
   // 오답노트
   ProblemBlock,
   SolutionBlock,
@@ -61,6 +62,8 @@ export function NoteBlockRenderer({ block, index }: BlockRendererProps) {
       return <TipBlockView block={block} />;
     case 'divider':
       return <View style={styles.divider} />;
+    case 'simpleSection':
+      return <SimpleSectionBlockView block={block} />;
     // 오답노트
     case 'problem':
       return <ProblemBlockView block={block} />;
@@ -254,6 +257,20 @@ function TipBlockView({ block }: { block: TipBlock }) {
     <View style={[styles.tipContainer, { backgroundColor: style.bg, borderLeftColor: style.border }]}>
       <Text style={styles.tipIcon}>{style.icon}</Text>
       <Text style={[styles.tipText, { color: style.text }]}>{block.content}</Text>
+    </View>
+  );
+}
+
+// ============================================
+// 단순 섹션 블록 (오답노트용)
+// ============================================
+
+function SimpleSectionBlockView({ block }: { block: SimpleSectionBlock }) {
+  return (
+    <View style={styles.simpleSectionContainer}>
+      <Text style={styles.sectionLabel}>{block.label}</Text>
+      <Text style={styles.simpleSectionContent}>{block.content}</Text>
+      <View style={styles.sectionDivider} />
     </View>
   );
 }
@@ -700,6 +717,19 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E5E7EB',
     marginVertical: 20,
+  },
+
+  // ============================================
+  // 단순 섹션 스타일
+  // ============================================
+
+  simpleSectionContainer: {
+    marginVertical: 8,
+  },
+  simpleSectionContent: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 26,
   },
 
   // ============================================
