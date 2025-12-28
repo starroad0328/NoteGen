@@ -49,6 +49,29 @@ export interface AuthResponse {
   token_type: string
 }
 
+export interface UsageInfo {
+  used: number
+  limit: number
+  remaining: number
+  is_unlimited: boolean
+}
+
+export interface PlanInfo {
+  id: string
+  name: string
+  price: number
+  price_display: string
+  monthly_limit: number
+  features: string[]
+  is_current: boolean
+}
+
+export interface PlansResponse {
+  current_plan: string
+  usage: UsageInfo
+  plans: PlanInfo[]
+}
+
 export interface ProcessResponse {
   note_id: number
   status: string
@@ -195,6 +218,20 @@ export const authAPI = {
     data: { name?: string; school_level?: string; grade?: number }
   ): Promise<User> => {
     const response = await apiClient.put('/api/auth/me', data, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  getUsage: async (token: string): Promise<UsageInfo> => {
+    const response = await apiClient.get('/api/auth/usage', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  getPlans: async (token: string): Promise<PlansResponse> => {
+    const response = await apiClient.get('/api/auth/plans', {
       headers: { Authorization: `Bearer ${token}` },
     })
     return response.data

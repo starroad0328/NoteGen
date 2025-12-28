@@ -48,3 +48,32 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     school_level: Optional[SchoolLevel] = None
     grade: Optional[int] = None
+
+
+class UsageResponse(BaseModel):
+    """사용량 정보 응답"""
+    used: int
+    limit: int
+    remaining: int
+    is_unlimited: bool
+
+    class Config:
+        from_attributes = True
+
+
+class PlanInfo(BaseModel):
+    """플랜 정보"""
+    id: str
+    name: str
+    price: int  # 원
+    price_display: str
+    monthly_limit: int
+    features: list[str]
+    is_current: bool = False
+
+
+class PlansResponse(BaseModel):
+    """플랜 목록 응답"""
+    current_plan: str
+    usage: UsageResponse
+    plans: list[PlanInfo]

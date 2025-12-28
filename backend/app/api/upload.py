@@ -71,6 +71,19 @@ async def upload_images(
     - 로그인 시 사용자 학년에 맞는 교육과정 기반 보충 설명 제공
     """
 
+    # 사용량 체크 (로그인 사용자만)
+    if current_user:
+        if not current_user.can_use_service():
+            usage_info = current_user.get_usage_info()
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "message": f"이번 달 무료 사용량({usage_info['limit']}회)을 모두 사용했습니다.",
+                    "usage": usage_info,
+                    "upgrade_required": True
+                }
+            )
+
     # 파일 개수 확인
     if len(files) > settings.MAX_FILES_PER_UPLOAD:
         raise HTTPException(
@@ -104,6 +117,11 @@ async def upload_images(
     db.add(note)
     db.commit()
     db.refresh(note)
+
+    # 사용량 증가 (로그인 사용자만)
+    if current_user:
+        current_user.increment_usage()
+        db.commit()
 
     # 자동으로 처리 시작 (백그라운드)
     from app.api.process import process_note_pipeline

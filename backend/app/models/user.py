@@ -3,8 +3,8 @@ User Database Model
 사용자 데이터베이스 모델
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean, Date
+from datetime import datetime, date
 import enum
 
 from app.models.base import Base
@@ -60,6 +60,10 @@ class User(Base):
     # 활성 상태
     is_active = Column(Boolean, default=True)
 
+    # 월간 사용량 제한
+    monthly_usage = Column(Integer, default=0)  # 이번 달 사용 횟수
+    usage_reset_date = Column(Date, default=date.today)  # 마지막 리셋 날짜
+
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', plan='{self.plan}')>"
 
@@ -83,3 +87,43 @@ class User(Base):
     def can_use_model(self, model: AIModel) -> bool:
         """특정 모델 사용 가능 여부 확인"""
         return model in self.get_allowed_models()
+
+    def get_monthly_limit(self) -> int:
+        """플랜별 월간 사용 제한 반환"""
+        limits = {
+            UserPlan.FREE: 10,
+            UserPlan.BASIC: 100,
+            UserPlan.PRO: -1,  # 무제한
+        }
+        return limits.get(self.plan, 10)
+
+    def check_and_reset_usage(self) -> None:
+        """월이 바뀌었으면 사용량 리셋"""
+        today = date.today()
+        if self.usage_reset_date is None or self.usage_reset_date.month != today.month or self.usage_reset_date.year != today.year:
+            self.monthly_usage = 0
+            self.usage_reset_date = today
+
+    def can_use_service(self) -> bool:
+        """서비스 사용 가능 여부 (사용량 체크)"""
+        self.check_and_reset_usage()
+        limit = self.get_monthly_limit()
+        if limit == -1:  # 무제한
+            return True
+        return self.monthly_usage < limit
+
+    def increment_usage(self) -> None:
+        """사용량 증가"""
+        self.check_and_reset_usage()
+        self.monthly_usage += 1
+
+    def get_usage_info(self) -> dict:
+        """사용량 정보 반환"""
+        self.check_and_reset_usage()
+        limit = self.get_monthly_limit()
+        return {
+            "used": self.monthly_usage,
+            "limit": limit,
+            "remaining": max(0, limit - self.monthly_usage) if limit != -1 else -1,
+            "is_unlimited": limit == -1,
+        }

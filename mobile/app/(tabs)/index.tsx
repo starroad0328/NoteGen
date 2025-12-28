@@ -2,11 +2,11 @@
  * 필기 정리 탭 (메인 + 업로드)
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Alert } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { uploadAPI } from '../../services/api'
+import { uploadAPI, authAPI, UsageInfo } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
 export default function HomeTab() {
@@ -15,6 +15,16 @@ export default function HomeTab() {
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
   const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'error_note' | 'vocab'>('basic_summary')
   const [uploading, setUploading] = useState(false)
+  const [usage, setUsage] = useState<UsageInfo | null>(null)
+
+  // 탭 포커스될 때마다 사용량 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      if (token) {
+        authAPI.getUsage(token).then(setUsage).catch(console.error)
+      }
+    }, [token])
+  )
 
   const takePhoto = async () => {
     if (!user) {
@@ -67,7 +77,23 @@ export default function HomeTab() {
       setImages([]) // 업로드 후 초기화
       router.push('/processing/' + uploadResult.id)
     } catch (error: any) {
-      Alert.alert('오류', error.response?.data?.detail || error.message || '업로드 중 오류가 발생했습니다.')
+      // 사용량 초과 에러 (429)
+      if (error.response?.status === 429) {
+        const detail = error.response?.data?.detail
+        Alert.alert(
+          '사용량 초과',
+          detail?.message || '이번 달 무료 사용량을 모두 사용했습니다.',
+          [
+            { text: '닫기', style: 'cancel' },
+            { text: '플랜 보기', onPress: () => router.push('/(tabs)/plan') }
+          ]
+        )
+      } else {
+        const errorMessage = typeof error.response?.data?.detail === 'string'
+          ? error.response.data.detail
+          : error.message || '업로드 중 오류가 발생했습니다.'
+        Alert.alert('오류', errorMessage)
+      }
     } finally { setUploading(false) }
   }
 
@@ -86,11 +112,23 @@ export default function HomeTab() {
         <View style={styles.header}>
           <Text style={styles.logo}>📝</Text>
           <Text style={styles.title}>필기 정리</Text>
-          {user?.grade_display && (
-            <View style={styles.gradeBadge}>
-              <Text style={styles.gradeBadgeText}>{user.grade_display}</Text>
-            </View>
-          )}
+          <View style={styles.badgeRow}>
+            {user?.grade_display && (
+              <View style={styles.gradeBadge}>
+                <Text style={styles.gradeBadgeText}>{user.grade_display}</Text>
+              </View>
+            )}
+            {usage && !usage.is_unlimited && (
+              <TouchableOpacity
+                style={[styles.usageBadge, usage.remaining === 0 && styles.usageBadgeDanger]}
+                onPress={() => router.push('/(tabs)/plan')}
+              >
+                <Text style={styles.usageBadgeText}>
+                  {usage.used}/{usage.limit}회
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {!user && (
@@ -216,6 +254,10 @@ const styles = StyleSheet.create({
     color: '#2C2C2C',
     marginBottom: 8,
   },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   gradeBadge: {
     backgroundColor: '#10B981',
     paddingHorizontal: 12,
@@ -223,6 +265,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   gradeBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  usageBadge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  usageBadgeDanger: {
+    backgroundColor: '#EF4444',
+  },
+  usageBadgeText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '600',

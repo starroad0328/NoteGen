@@ -11,7 +11,8 @@ from typing import Optional
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
-    UserRegister, UserLogin, Token, UserResponse, UserUpdate
+    UserRegister, UserLogin, Token, UserResponse, UserUpdate,
+    UsageResponse, PlanInfo, PlansResponse
 )
 from app.services.auth_service import (
     get_password_hash, verify_password, create_access_token, decode_access_token
@@ -172,4 +173,89 @@ async def update_me(
         grade=user.grade,
         grade_display=user.grade_display,
         plan=user.plan.value
+    )
+
+
+@router.get("/usage", response_model=UsageResponse)
+async def get_usage(
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """사용량 조회"""
+    # 월이 바뀌었으면 리셋
+    user.check_and_reset_usage()
+    db.commit()
+
+    usage_info = user.get_usage_info()
+    return UsageResponse(**usage_info)
+
+
+@router.get("/plans", response_model=PlansResponse)
+async def get_plans(
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """플랜 목록 및 현재 사용량 조회"""
+    # 월이 바뀌었으면 리셋
+    user.check_and_reset_usage()
+    db.commit()
+
+    usage_info = user.get_usage_info()
+
+    # 플랜 정보 정의
+    plans = [
+        PlanInfo(
+            id="free",
+            name="Free",
+            price=0,
+            price_display="무료",
+            monthly_limit=10,
+            features=[
+                "월 10회 필기 정리",
+                "AI 모델: GPT-5 mini",
+                "Free용 정리법",
+                "문제 자동 생성 5문제",
+                "노트 저장/검색",
+            ],
+            is_current=user.plan.value == "free"
+        ),
+        PlanInfo(
+            id="basic",
+            name="Basic",
+            price=6990,
+            price_display="6,990/월",
+            monthly_limit=100,
+            features=[
+                "월 100회 필기 정리",
+                "AI 모델: GPT-5",
+                "Basic용 정리법",
+                "문제 자동 생성 15문제",
+                "노트 저장/검색",
+            ],
+            is_current=user.plan.value == "basic"
+        ),
+        PlanInfo(
+            id="pro",
+            name="Pro",
+            price=14900,
+            price_display="14,900/월",
+            monthly_limit=-1,
+            features=[
+                "무제한 필기 정리",
+                "AI 모델: GPT-5.2",
+                "Pro용 정리법",
+                "문제 자동 생성 30문제",
+                "개념 강조",
+                "출제자 관점 정리",
+                "헷갈리는 개념 비교표",
+                "시험 직전 압축 노트",
+            ],
+            is_current=user.plan.value == "pro"
+        ),
+    ]
+
+    return PlansResponse(
+        current_plan=user.plan.value,
+        usage=UsageResponse(**usage_info),
+        plans=plans
     )
