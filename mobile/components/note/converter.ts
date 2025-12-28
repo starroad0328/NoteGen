@@ -125,7 +125,7 @@ export function convertCornellToNoteData(
 }
 
 // 오답노트 섹션 타입
-type WrongAnswerSection = 'problem' | 'myAnswer' | 'wrongReason' | 'solution' | 'concept' | null;
+type WrongAnswerSection = 'problem' | 'myAnswer' | 'wrongAnswer' | 'wrongReason' | 'solution' | 'formula' | 'caution' | 'concept' | null;
 
 // 오답노트 섹션 패턴 감지
 function detectWrongAnswerSection(line: string): { section: WrongAnswerSection; content: string } {
@@ -143,9 +143,15 @@ function detectWrongAnswerSection(line: string): { section: WrongAnswerSection; 
     return { section: 'myAnswer', content };
   }
 
-  // **오답**, **틀린 이유**, **틀린 포인트** 패턴
-  if (/^\*\*오답[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*틀린[^*]*\*\*[:\s]*/i.test(trimmed)) {
-    const content = trimmed.replace(/^\*\*오답[^*]*\*\*[:\s]*/, '').replace(/^\*\*틀린[^*]*\*\*[:\s]*/, '').trim();
+  // **오답**: (틀린 답 자체)
+  if (/^\*\*오답\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*오답\*\*[:\s]*/, '').trim();
+    return { section: 'wrongAnswer', content };
+  }
+
+  // **틀린 이유**, **틀린 포인트** 패턴
+  if (/^\*\*틀린[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*틀린[^*]*\*\*[:\s]*/, '').trim();
     return { section: 'wrongReason', content };
   }
 
@@ -153,6 +159,18 @@ function detectWrongAnswerSection(line: string): { section: WrongAnswerSection; 
   if (/^\*\*정답[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*올바른[^*]*\*\*[:\s]*/i.test(trimmed)) {
     const content = trimmed.replace(/^\*\*정답[^*]*\*\*[:\s]*/, '').replace(/^\*\*올바른[^*]*\*\*[:\s]*/, '').trim();
     return { section: 'solution', content };
+  }
+
+  // **핵심 공식**, **관련 공식** 패턴
+  if (/^\*\*핵심\s*공식[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*관련\s*공식[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*핵심\s*공식[^*]*\*\*[:\s]*/, '').replace(/^\*\*관련\s*공식[^*]*\*\*[:\s]*/, '').trim();
+    return { section: 'formula', content };
+  }
+
+  // **주의점**, **주의사항** 패턴
+  if (/^\*\*주의[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*주의[^*]*\*\*[:\s]*/, '').trim();
+    return { section: 'caution', content };
   }
 
   // **관련 개념**, **핵심 개념** 패턴
@@ -195,8 +213,11 @@ function convertWrongAnswerMarkdownToNoteData(
   const sections: Record<string, string[]> = {
     problem: [],
     myAnswer: [],
+    wrongAnswer: [],
     wrongReason: [],
     solution: [],
+    formula: [],
+    caution: [],
     concept: [],
   };
 
@@ -277,24 +298,57 @@ function convertWrongAnswerMarkdownToNoteData(
     } as ProblemBlock);
   }
 
-  // 틀린 포인트 블록 (내 풀이 + 틀린 이유)
-  if (sections.myAnswer.length > 0 || sections.wrongReason.length > 0) {
+  // 내 풀이 블록
+  if (sections.myAnswer.length > 0) {
     blocks.push({
       type: 'wrongPoint',
-      myAnswer: sections.myAnswer.filter(s => s).join('\n') || undefined,
-      reason: sections.wrongReason.filter(s => s).join('\n') || '분석 중...',
-      correction: sections.solution.length > 0
-        ? sections.solution.filter(s => s).join('\n')
-        : '정답을 확인해주세요.',
+      myAnswer: sections.myAnswer.filter(s => s).join('\n'),
+      reason: '',
+      correction: '',
     } as WrongPointBlock);
   }
 
-  // 정답 블록 (틀린 포인트에서 correction으로 안 넣었으면)
-  if (sections.solution.length > 0 && sections.myAnswer.length === 0 && sections.wrongReason.length === 0) {
+  // 오답 (틀린 답)
+  if (sections.wrongAnswer.length > 0) {
+    blocks.push({
+      type: 'tip',
+      content: sections.wrongAnswer.filter(s => s).join('\n'),
+      variant: 'warning',
+    } as any);
+  }
+
+  // 정답 블록
+  if (sections.solution.length > 0) {
     blocks.push({
       type: 'solution',
       answer: sections.solution.filter(s => s).join('\n'),
     } as SolutionBlock);
+  }
+
+  // 틀린 이유 블록
+  if (sections.wrongReason.length > 0) {
+    blocks.push({
+      type: 'wrongPoint',
+      reason: sections.wrongReason.filter(s => s).join('\n'),
+      correction: '',
+    } as WrongPointBlock);
+  }
+
+  // 핵심 공식 블록
+  if (sections.formula.length > 0) {
+    blocks.push({
+      type: 'formula',
+      content: sections.formula.filter(s => s).join('\n'),
+    } as any);
+  }
+
+  // 주의점 블록
+  if (sections.caution.length > 0) {
+    blocks.push({
+      type: 'tip',
+      content: sections.caution.filter(s => s).join('\n'),
+      variant: 'warning',
+    } as any);
   }
 
   // 관련 개념 블록

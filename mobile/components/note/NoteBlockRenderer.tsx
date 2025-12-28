@@ -317,18 +317,22 @@ function WrongPointBlockView({ block }: { block: WrongPointBlock }) {
       )}
 
       {/* 틀린 이유 */}
-      <View style={styles.wrongSection}>
-        <Text style={styles.sectionLabel}>틀린 이유</Text>
-        <Text style={styles.reasonText}>{block.reason}</Text>
-        <View style={styles.sectionDivider} />
-      </View>
+      {block.reason && (
+        <View style={styles.wrongSection}>
+          <Text style={styles.sectionLabel}>틀린 이유</Text>
+          <Text style={styles.reasonText}>{block.reason}</Text>
+          <View style={styles.sectionDivider} />
+        </View>
+      )}
 
       {/* 올바른 접근 */}
-      <View style={styles.wrongSection}>
-        <Text style={styles.sectionLabel}>올바른 접근</Text>
-        <Text style={styles.correctionText}>{block.correction}</Text>
-        <View style={styles.sectionDivider} />
-      </View>
+      {block.correction && (
+        <View style={styles.wrongSection}>
+          <Text style={styles.sectionLabel}>올바른 접근</Text>
+          <Text style={styles.correctionText}>{block.correction}</Text>
+          <View style={styles.sectionDivider} />
+        </View>
+      )}
     </View>
   );
 }
