@@ -266,16 +266,20 @@ function TipBlockView({ block }: { block: TipBlock }) {
 function ProblemBlockView({ block }: { block: ProblemBlock }) {
   return (
     <View style={styles.problemContainer}>
-      <View style={styles.problemHeader}>
-        <Text style={styles.problemIcon}>📝</Text>
-        <Text style={styles.problemLabel}>
+      {/* 섹션 헤더 바 */}
+      <View style={styles.problemHeaderBar}>
+        <Text style={styles.problemHeaderIcon}>📝</Text>
+        <Text style={styles.problemHeaderText}>
           {block.number ? `문제 ${block.number}` : '문제'}
         </Text>
         {block.source && (
-          <Text style={styles.problemSource}>{block.source}</Text>
+          <Text style={styles.problemSource}>({block.source})</Text>
         )}
       </View>
-      <Text style={styles.problemContent}>{block.content}</Text>
+      {/* 문제 내용 */}
+      <View style={styles.problemBody}>
+        <Text style={styles.problemContent}>{block.content}</Text>
+      </View>
     </View>
   );
 }
@@ -284,26 +288,42 @@ function ProblemBlockView({ block }: { block: ProblemBlock }) {
 function SolutionBlockView({ block }: { block: SolutionBlock }) {
   return (
     <View style={styles.solutionContainer}>
-      <View style={styles.solutionHeader}>
-        <Text style={styles.solutionIcon}>✅</Text>
-        <Text style={styles.solutionLabel}>정답</Text>
+      {/* 정답 섹션 */}
+      <View style={styles.solutionSection}>
+        <View style={styles.solutionHeaderBar}>
+          <Text style={styles.solutionHeaderIcon}>✅</Text>
+          <Text style={styles.solutionHeaderText}>정답</Text>
+        </View>
+        <View style={styles.solutionBody}>
+          <Text style={styles.solutionAnswer}>{block.answer}</Text>
+        </View>
       </View>
-      <Text style={styles.solutionAnswer}>{block.answer}</Text>
 
+      {/* 풀이 과정 섹션 */}
       {block.steps && block.steps.length > 0 && (
-        <View style={styles.solutionSteps}>
-          <Text style={styles.stepsLabel}>풀이 과정</Text>
-          {block.steps.map((step, i) => (
-            <View key={i} style={styles.stepItem}>
-              <Text style={styles.stepNumber}>{i + 1}</Text>
-              <Text style={styles.stepText}>{step}</Text>
-            </View>
-          ))}
+        <View style={styles.stepsSection}>
+          <View style={styles.stepsHeaderBar}>
+            <Text style={styles.stepsHeaderIcon}>📖</Text>
+            <Text style={styles.stepsHeaderText}>풀이 과정</Text>
+          </View>
+          <View style={styles.stepsBody}>
+            {block.steps.map((step, i) => (
+              <View key={i} style={styles.stepItem}>
+                <View style={styles.stepNumberBadge}>
+                  <Text style={styles.stepNumberText}>{i + 1}</Text>
+                </View>
+                <Text style={styles.stepText}>{step}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
+      {/* 추가 설명 */}
       {block.explanation && (
-        <Text style={styles.solutionExplanation}>{block.explanation}</Text>
+        <View style={styles.explanationSection}>
+          <Text style={styles.solutionExplanation}>{block.explanation}</Text>
+        </View>
       )}
     </View>
   );
@@ -313,26 +333,39 @@ function SolutionBlockView({ block }: { block: SolutionBlock }) {
 function WrongPointBlockView({ block }: { block: WrongPointBlock }) {
   return (
     <View style={styles.wrongPointContainer}>
-      <View style={styles.wrongPointHeader}>
-        <Text style={styles.wrongPointIcon}>❌</Text>
-        <Text style={styles.wrongPointLabel}>틀린 포인트</Text>
-      </View>
-
+      {/* 내가 쓴 답 섹션 */}
       {block.myAnswer && (
-        <View style={styles.myAnswerBox}>
-          <Text style={styles.myAnswerLabel}>내가 쓴 답</Text>
-          <Text style={styles.myAnswerText}>{block.myAnswer}</Text>
+        <View style={styles.myAnswerSection}>
+          <View style={styles.myAnswerHeaderBar}>
+            <Text style={styles.myAnswerHeaderIcon}>✏️</Text>
+            <Text style={styles.myAnswerHeaderText}>내가 쓴 답</Text>
+          </View>
+          <View style={styles.myAnswerBody}>
+            <Text style={styles.myAnswerText}>{block.myAnswer}</Text>
+          </View>
         </View>
       )}
 
-      <View style={styles.reasonBox}>
-        <Text style={styles.reasonLabel}>틀린 이유</Text>
-        <Text style={styles.reasonText}>{block.reason}</Text>
+      {/* 틀린 이유 섹션 */}
+      <View style={styles.reasonSection}>
+        <View style={styles.reasonHeaderBar}>
+          <Text style={styles.reasonHeaderIcon}>❌</Text>
+          <Text style={styles.reasonHeaderText}>틀린 이유</Text>
+        </View>
+        <View style={styles.reasonBody}>
+          <Text style={styles.reasonText}>{block.reason}</Text>
+        </View>
       </View>
 
-      <View style={styles.correctionBox}>
-        <Text style={styles.correctionLabel}>올바른 접근</Text>
-        <Text style={styles.correctionText}>{block.correction}</Text>
+      {/* 올바른 접근 섹션 */}
+      <View style={styles.correctionSection}>
+        <View style={styles.correctionHeaderBar}>
+          <Text style={styles.correctionHeaderIcon}>💡</Text>
+          <Text style={styles.correctionHeaderText}>올바른 접근</Text>
+        </View>
+        <View style={styles.correctionBody}>
+          <Text style={styles.correctionText}>{block.correction}</Text>
+        </View>
       </View>
     </View>
   );
@@ -342,20 +375,26 @@ function WrongPointBlockView({ block }: { block: WrongPointBlock }) {
 function ConceptBlockView({ block }: { block: ConceptBlock }) {
   return (
     <View style={styles.conceptContainer}>
-      <View style={styles.conceptHeader}>
-        <Text style={styles.conceptIcon}>💡</Text>
-        <Text style={styles.conceptTitle}>{block.title}</Text>
+      {/* 개념 헤더 */}
+      <View style={styles.conceptHeaderBar}>
+        <Text style={styles.conceptHeaderIcon}>📚</Text>
+        <Text style={styles.conceptHeaderText}>관련 개념</Text>
       </View>
-      <Text style={styles.conceptContent}>{block.content}</Text>
 
-      {block.relatedFormulas && block.relatedFormulas.length > 0 && (
-        <View style={styles.relatedFormulas}>
-          <Text style={styles.formulasLabel}>관련 공식</Text>
-          {block.relatedFormulas.map((formula, i) => (
-            <Text key={i} style={styles.relatedFormula}>{formula}</Text>
-          ))}
-        </View>
-      )}
+      {/* 개념 본문 */}
+      <View style={styles.conceptBody}>
+        <Text style={styles.conceptTitle}>{block.title}</Text>
+        <Text style={styles.conceptContent}>{block.content}</Text>
+
+        {block.relatedFormulas && block.relatedFormulas.length > 0 && (
+          <View style={styles.relatedFormulas}>
+            <Text style={styles.formulasLabel}>관련 공식</Text>
+            {block.relatedFormulas.map((formula, i) => (
+              <Text key={i} style={styles.relatedFormula}>{formula}</Text>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -708,33 +747,38 @@ const styles = StyleSheet.create({
   // 오답노트 스타일
   // ============================================
 
-  // 문제
+  // 문제 블록
   problemContainer: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
-    padding: 16,
     marginVertical: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#FECACA',
   },
-  problemHeader: {
+  problemHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
-  problemIcon: {
-    fontSize: 18,
+  problemHeaderIcon: {
+    fontSize: 16,
     marginRight: 8,
   },
-  problemLabel: {
+  problemHeaderText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#DC2626',
+    color: 'white',
     flex: 1,
   },
   problemSource: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  problemBody: {
+    backgroundColor: '#FEF2F2',
+    padding: 16,
   },
   problemContent: {
     fontSize: 16,
@@ -742,171 +786,242 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // 풀이/정답
+  // 풀이/정답 블록
   solutionContainer: {
-    backgroundColor: '#ECFDF5',
-    borderRadius: 12,
-    padding: 16,
     marginVertical: 12,
+  },
+  solutionSection: {
+    borderRadius: 12,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#A7F3D0',
+    marginBottom: 10,
   },
-  solutionHeader: {
+  solutionHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
-  solutionIcon: {
-    fontSize: 18,
+  solutionHeaderIcon: {
+    fontSize: 16,
     marginRight: 8,
   },
-  solutionLabel: {
+  solutionHeaderText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#059669',
+    color: 'white',
+  },
+  solutionBody: {
+    backgroundColor: '#ECFDF5',
+    padding: 16,
   },
   solutionAnswer: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#065F46',
-    marginBottom: 12,
   },
-  solutionSteps: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#A7F3D0',
+  stepsSection: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    marginBottom: 10,
   },
-  stepsLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-    marginBottom: 8,
+  stepsHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  stepsHeaderIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  stepsHeaderText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
+  },
+  stepsBody: {
+    backgroundColor: '#F0FDF4',
+    padding: 16,
   },
   stepItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  stepNumberBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  stepNumberText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginRight: 10,
-    overflow: 'hidden',
   },
   stepText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#065F46',
-    lineHeight: 22,
+    lineHeight: 24,
+  },
+  explanationSection: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   solutionExplanation: {
     fontSize: 14,
     color: '#047857',
     lineHeight: 22,
-    marginTop: 8,
+    fontStyle: 'italic',
   },
 
-  // 틀린 포인트
+  // 틀린 포인트 블록
   wrongPointContainer: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 12,
-    padding: 16,
     marginVertical: 12,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
   },
-  wrongPointHeader: {
+  myAnswerSection: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    marginBottom: 10,
+  },
+  myAnswerHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: '#EF4444',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
-  wrongPointIcon: {
-    fontSize: 18,
+  myAnswerHeaderIcon: {
+    fontSize: 16,
     marginRight: 8,
   },
-  wrongPointLabel: {
+  myAnswerHeaderText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#D97706',
+    color: 'white',
   },
-  myAnswerBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-  },
-  myAnswerLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#DC2626',
-    marginBottom: 4,
+  myAnswerBody: {
+    backgroundColor: '#FEE2E2',
+    padding: 16,
   },
   myAnswerText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#991B1B',
     textDecorationLine: 'line-through',
+    textDecorationColor: '#DC2626',
   },
-  reasonBox: {
+  reasonSection: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
     marginBottom: 10,
   },
-  reasonLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#D97706',
-    marginBottom: 4,
+  reasonHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D97706',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  reasonHeaderIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  reasonHeaderText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
+  },
+  reasonBody: {
+    backgroundColor: '#FEF3C7',
+    padding: 16,
   },
   reasonText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#92400E',
-    lineHeight: 22,
+    lineHeight: 24,
   },
-  correctionBox: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderRadius: 8,
-    padding: 12,
+  correctionSection: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
-  correctionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#059669',
-    marginBottom: 4,
+  correctionHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  correctionHeaderIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  correctionHeaderText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
+  },
+  correctionBody: {
+    backgroundColor: '#ECFDF5',
+    padding: 16,
   },
   correctionText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#065F46',
-    lineHeight: 22,
+    lineHeight: 24,
   },
 
-  // 관련 개념
+  // 관련 개념 블록
   conceptContainer: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
-    padding: 16,
     marginVertical: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#C7D2FE',
   },
-  conceptHeader: {
+  conceptHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    backgroundColor: '#4F46E5',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
-  conceptIcon: {
-    fontSize: 18,
+  conceptHeaderIcon: {
+    fontSize: 16,
     marginRight: 8,
   },
+  conceptHeaderText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
+  },
+  conceptBody: {
+    backgroundColor: '#EEF2FF',
+    padding: 16,
+  },
   conceptTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#4338CA',
+    marginBottom: 8,
   },
   conceptContent: {
     fontSize: 15,
@@ -914,22 +1029,29 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   relatedFormulas: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#C7D2FE',
   },
   formulasLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#6366F1',
-    marginBottom: 6,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   relatedFormula: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#4338CA',
     fontFamily: 'monospace',
-    marginBottom: 4,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginBottom: 6,
+    overflow: 'hidden',
   },
 
   // ============================================
