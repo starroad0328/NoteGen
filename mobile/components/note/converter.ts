@@ -13,6 +13,13 @@ import {
   SummaryBlock,
   ImportantBlock,
   ExampleBlock,
+  // 오답노트
+  ProblemBlock,
+  SolutionBlock,
+  WrongPointBlock,
+  ConceptBlock,
+  // 단어장
+  VocabularyBlock,
 } from './types';
 
 // 코넬식 JSON 데이터 타입 (기존 형식)
@@ -117,6 +124,195 @@ export function convertCornellToNoteData(
   };
 }
 
+// 오답노트 섹션 타입
+type WrongAnswerSection = 'problem' | 'myAnswer' | 'wrongReason' | 'solution' | 'concept' | null;
+
+// 오답노트 섹션 패턴 감지
+function detectWrongAnswerSection(line: string): { section: WrongAnswerSection; content: string } {
+  const trimmed = line.trim();
+
+  // **문제**: 또는 문제: 패턴
+  if (/^\*\*문제[^*]*\*\*[:\s]*/i.test(trimmed) || /^문제[:\s]+/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*문제[^*]*\*\*[:\s]*/, '').replace(/^문제[:\s]+/, '').trim();
+    return { section: 'problem', content };
+  }
+
+  // **내 풀이**, **내가 쓴 답** 패턴
+  if (/^\*\*내\s*풀이[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*내가\s*쓴\s*답[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*내\s*풀이[^*]*\*\*[:\s]*/, '').replace(/^\*\*내가\s*쓴\s*답[^*]*\*\*[:\s]*/, '').trim();
+    return { section: 'myAnswer', content };
+  }
+
+  // **오답**, **틀린 이유**, **틀린 포인트** 패턴
+  if (/^\*\*오답[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*틀린[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*오답[^*]*\*\*[:\s]*/, '').replace(/^\*\*틀린[^*]*\*\*[:\s]*/, '').trim();
+    return { section: 'wrongReason', content };
+  }
+
+  // **정답**, **올바른 풀이**, **올바른 접근** 패턴
+  if (/^\*\*정답[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*올바른[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*정답[^*]*\*\*[:\s]*/, '').replace(/^\*\*올바른[^*]*\*\*[:\s]*/, '').trim();
+    return { section: 'solution', content };
+  }
+
+  // **관련 개념**, **핵심 개념** 패턴
+  if (/^\*\*관련\s*개념[^*]*\*\*[:\s]*/i.test(trimmed) || /^\*\*핵심\s*개념[^*]*\*\*[:\s]*/i.test(trimmed)) {
+    const content = trimmed.replace(/^\*\*관련\s*개념[^*]*\*\*[:\s]*/, '').replace(/^\*\*핵심\s*개념[^*]*\*\*[:\s]*/, '').trim();
+    return { section: 'concept', content };
+  }
+
+  return { section: null, content: trimmed };
+}
+
+// 오답노트 마크다운인지 감지
+function isWrongAnswerMarkdown(markdown: string): boolean {
+  const patterns = [
+    /\*\*문제[^*]*\*\*/,
+    /\*\*내\s*풀이[^*]*\*\*/,
+    /\*\*오답[^*]*\*\*/,
+    /\*\*정답[^*]*\*\*/,
+    /\*\*틀린[^*]*\*\*/,
+  ];
+  return patterns.some(pattern => pattern.test(markdown));
+}
+
+/**
+ * 오답노트 마크다운을 NoteData로 변환
+ */
+function convertWrongAnswerMarkdownToNoteData(
+  markdown: string,
+  title: string,
+  metadata?: NoteData['metadata']
+): NoteData {
+  const blocks: NoteBlock[] = [];
+  const lines = markdown.split('\n');
+
+  let mainTitle = title;
+  let currentSection: WrongAnswerSection = null;
+  let sectionContent: string[] = [];
+
+  // 섹션 데이터 수집
+  const sections: Record<string, string[]> = {
+    problem: [],
+    myAnswer: [],
+    wrongReason: [],
+    solution: [],
+    concept: [],
+  };
+
+  const flushSection = () => {
+    if (currentSection && sectionContent.length > 0) {
+      sections[currentSection].push(...sectionContent);
+      sectionContent = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      if (sectionContent.length > 0) {
+        sectionContent.push(''); // 빈 줄 유지
+      }
+      continue;
+    }
+
+    // H1 제목
+    if (trimmed.startsWith('# ')) {
+      flushSection();
+      mainTitle = trimmed.replace('# ', '');
+      blocks.push({
+        type: 'title',
+        content: mainTitle,
+      } as TitleBlock);
+      currentSection = null;
+      continue;
+    }
+
+    // 섹션 감지
+    const detected = detectWrongAnswerSection(trimmed);
+    if (detected.section) {
+      flushSection();
+      currentSection = detected.section;
+      if (detected.content) {
+        sectionContent.push(detected.content);
+      }
+      continue;
+    }
+
+    // 현재 섹션에 내용 추가
+    if (currentSection) {
+      // 번호 매기기 패턴 (1. 2. 3.) 처리
+      const numberedMatch = trimmed.match(/^(\d+)\.\s*(.+)/);
+      if (numberedMatch) {
+        sectionContent.push(numberedMatch[2]);
+      } else {
+        sectionContent.push(trimmed);
+      }
+    } else {
+      // 섹션 외부 내용은 paragraph로
+      blocks.push({
+        type: 'paragraph',
+        content: trimmed,
+      } as ParagraphBlock);
+    }
+  }
+
+  flushSection();
+
+  // 제목이 없으면 추가
+  if (blocks.length === 0 || blocks[0].type !== 'title') {
+    blocks.unshift({
+      type: 'title',
+      content: mainTitle,
+    } as TitleBlock);
+  }
+
+  // 문제 블록 추가
+  if (sections.problem.length > 0) {
+    blocks.push({
+      type: 'problem',
+      content: sections.problem.filter(s => s).join('\n'),
+    } as ProblemBlock);
+  }
+
+  // 틀린 포인트 블록 (내 풀이 + 틀린 이유)
+  if (sections.myAnswer.length > 0 || sections.wrongReason.length > 0) {
+    blocks.push({
+      type: 'wrongPoint',
+      myAnswer: sections.myAnswer.filter(s => s).join('\n') || undefined,
+      reason: sections.wrongReason.filter(s => s).join('\n') || '분석 중...',
+      correction: sections.solution.length > 0
+        ? sections.solution.filter(s => s).join('\n')
+        : '정답을 확인해주세요.',
+    } as WrongPointBlock);
+  }
+
+  // 정답 블록 (틀린 포인트에서 correction으로 안 넣었으면)
+  if (sections.solution.length > 0 && sections.myAnswer.length === 0 && sections.wrongReason.length === 0) {
+    blocks.push({
+      type: 'solution',
+      answer: sections.solution.filter(s => s).join('\n'),
+    } as SolutionBlock);
+  }
+
+  // 관련 개념 블록
+  if (sections.concept.length > 0) {
+    blocks.push({
+      type: 'concept',
+      title: '관련 개념',
+      content: sections.concept.filter(s => s).join('\n'),
+    } as ConceptBlock);
+  }
+
+  return {
+    title: mainTitle,
+    blocks,
+    metadata,
+  };
+}
+
 /**
  * 마크다운을 통합 NoteData로 변환
  */
@@ -125,6 +321,11 @@ export function convertMarkdownToNoteData(
   title: string,
   metadata?: NoteData['metadata']
 ): NoteData {
+  // 오답노트 패턴 감지
+  if (metadata?.organizeMethod === 'wrong_answer' || isWrongAnswerMarkdown(markdown)) {
+    return convertWrongAnswerMarkdownToNoteData(markdown, title, metadata);
+  }
+
   const blocks: NoteBlock[] = [];
   const lines = markdown.split('\n');
 
