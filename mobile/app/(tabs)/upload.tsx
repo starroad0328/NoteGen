@@ -81,13 +81,17 @@ export default function HomeTab() {
       if (error.response?.status === 429) {
         const detail = error.response?.data?.detail
         Alert.alert(
-          '사용량 초과',
-          detail?.message || '이번 달 무료 사용량을 모두 사용했습니다.',
+          '이번 달 사용량을 모두 사용했어요',
+          'Basic 플랜으로 업그레이드하면\n월 100회까지 사용할 수 있어요!',
           [
-            { text: '닫기', style: 'cancel' },
-            { text: '플랜 보기', onPress: () => router.push('/(tabs)/plan') }
+            { text: '다음에', style: 'cancel' },
+            { text: '플랜 보기', onPress: () => router.push('/(tabs)/my') }
           ]
         )
+        // 사용량 새로고침
+        if (token) {
+          authAPI.getUsage(token).then(setUsage).catch(console.error)
+        }
       } else {
         const errorMessage = typeof error.response?.data?.detail === 'string'
           ? error.response.data.detail
