@@ -19,6 +19,13 @@ import {
   FormulaBlock,
   DefinitionBlock,
   TipBlock,
+  // 오답노트
+  ProblemBlock,
+  SolutionBlock,
+  WrongPointBlock,
+  ConceptBlock,
+  // 단어장
+  VocabularyBlock,
 } from './types';
 
 interface BlockRendererProps {
@@ -54,6 +61,18 @@ export function NoteBlockRenderer({ block, index }: BlockRendererProps) {
       return <TipBlockView block={block} />;
     case 'divider':
       return <View style={styles.divider} />;
+    // 오답노트
+    case 'problem':
+      return <ProblemBlockView block={block} />;
+    case 'solution':
+      return <SolutionBlockView block={block} />;
+    case 'wrongPoint':
+      return <WrongPointBlockView block={block} />;
+    case 'concept':
+      return <ConceptBlockView block={block} />;
+    // 단어장
+    case 'vocabulary':
+      return <VocabularyBlockView block={block} />;
     default:
       return null;
   }
@@ -235,6 +254,159 @@ function TipBlockView({ block }: { block: TipBlock }) {
     <View style={[styles.tipContainer, { backgroundColor: style.bg, borderLeftColor: style.border }]}>
       <Text style={styles.tipIcon}>{style.icon}</Text>
       <Text style={[styles.tipText, { color: style.text }]}>{block.content}</Text>
+    </View>
+  );
+}
+
+// ============================================
+// 오답노트용 블록
+// ============================================
+
+// 문제 블록
+function ProblemBlockView({ block }: { block: ProblemBlock }) {
+  return (
+    <View style={styles.problemContainer}>
+      <View style={styles.problemHeader}>
+        <Text style={styles.problemIcon}>📝</Text>
+        <Text style={styles.problemLabel}>
+          {block.number ? `문제 ${block.number}` : '문제'}
+        </Text>
+        {block.source && (
+          <Text style={styles.problemSource}>{block.source}</Text>
+        )}
+      </View>
+      <Text style={styles.problemContent}>{block.content}</Text>
+    </View>
+  );
+}
+
+// 풀이/정답 블록
+function SolutionBlockView({ block }: { block: SolutionBlock }) {
+  return (
+    <View style={styles.solutionContainer}>
+      <View style={styles.solutionHeader}>
+        <Text style={styles.solutionIcon}>✅</Text>
+        <Text style={styles.solutionLabel}>정답</Text>
+      </View>
+      <Text style={styles.solutionAnswer}>{block.answer}</Text>
+
+      {block.steps && block.steps.length > 0 && (
+        <View style={styles.solutionSteps}>
+          <Text style={styles.stepsLabel}>풀이 과정</Text>
+          {block.steps.map((step, i) => (
+            <View key={i} style={styles.stepItem}>
+              <Text style={styles.stepNumber}>{i + 1}</Text>
+              <Text style={styles.stepText}>{step}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {block.explanation && (
+        <Text style={styles.solutionExplanation}>{block.explanation}</Text>
+      )}
+    </View>
+  );
+}
+
+// 틀린 포인트 블록
+function WrongPointBlockView({ block }: { block: WrongPointBlock }) {
+  return (
+    <View style={styles.wrongPointContainer}>
+      <View style={styles.wrongPointHeader}>
+        <Text style={styles.wrongPointIcon}>❌</Text>
+        <Text style={styles.wrongPointLabel}>틀린 포인트</Text>
+      </View>
+
+      {block.myAnswer && (
+        <View style={styles.myAnswerBox}>
+          <Text style={styles.myAnswerLabel}>내가 쓴 답</Text>
+          <Text style={styles.myAnswerText}>{block.myAnswer}</Text>
+        </View>
+      )}
+
+      <View style={styles.reasonBox}>
+        <Text style={styles.reasonLabel}>틀린 이유</Text>
+        <Text style={styles.reasonText}>{block.reason}</Text>
+      </View>
+
+      <View style={styles.correctionBox}>
+        <Text style={styles.correctionLabel}>올바른 접근</Text>
+        <Text style={styles.correctionText}>{block.correction}</Text>
+      </View>
+    </View>
+  );
+}
+
+// 관련 개념 블록
+function ConceptBlockView({ block }: { block: ConceptBlock }) {
+  return (
+    <View style={styles.conceptContainer}>
+      <View style={styles.conceptHeader}>
+        <Text style={styles.conceptIcon}>💡</Text>
+        <Text style={styles.conceptTitle}>{block.title}</Text>
+      </View>
+      <Text style={styles.conceptContent}>{block.content}</Text>
+
+      {block.relatedFormulas && block.relatedFormulas.length > 0 && (
+        <View style={styles.relatedFormulas}>
+          <Text style={styles.formulasLabel}>관련 공식</Text>
+          {block.relatedFormulas.map((formula, i) => (
+            <Text key={i} style={styles.relatedFormula}>{formula}</Text>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ============================================
+// 단어장용 블록
+// ============================================
+
+// 단어 블록
+function VocabularyBlockView({ block }: { block: VocabularyBlock }) {
+  return (
+    <View style={styles.vocabContainer}>
+      <View style={styles.vocabHeader}>
+        <Text style={styles.vocabWord}>{block.word}</Text>
+        {block.pronunciation && (
+          <Text style={styles.vocabPronunciation}>[{block.pronunciation}]</Text>
+        )}
+        {block.partOfSpeech && (
+          <View style={styles.posBadge}>
+            <Text style={styles.posText}>{block.partOfSpeech}</Text>
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.vocabMeaning}>{block.meaning}</Text>
+
+      {block.exampleSentence && (
+        <View style={styles.vocabExample}>
+          <Text style={styles.exampleSentence}>{block.exampleSentence}</Text>
+          {block.exampleTranslation && (
+            <Text style={styles.exampleTranslation}>{block.exampleTranslation}</Text>
+          )}
+        </View>
+      )}
+
+      {(block.synonyms?.length || block.antonyms?.length) && (
+        <View style={styles.vocabRelated}>
+          {block.synonyms && block.synonyms.length > 0 && (
+            <Text style={styles.synonyms}>
+              <Text style={styles.relatedLabel}>유의어: </Text>
+              {block.synonyms.join(', ')}
+            </Text>
+          )}
+          {block.antonyms && block.antonyms.length > 0 && (
+            <Text style={styles.antonyms}>
+              <Text style={styles.relatedLabel}>반의어: </Text>
+              {block.antonyms.join(', ')}
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -530,5 +702,320 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E5E7EB',
     marginVertical: 20,
+  },
+
+  // ============================================
+  // 오답노트 스타일
+  // ============================================
+
+  // 문제
+  problemContainer: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  problemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  problemIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  problemLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DC2626',
+    flex: 1,
+  },
+  problemSource: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  problemContent: {
+    fontSize: 16,
+    color: '#1F2937',
+    lineHeight: 26,
+  },
+
+  // 풀이/정답
+  solutionContainer: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  solutionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  solutionIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  solutionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  solutionAnswer: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#065F46',
+    marginBottom: 12,
+  },
+  solutionSteps: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#A7F3D0',
+  },
+  stepsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+    marginBottom: 8,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginRight: 10,
+    overflow: 'hidden',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#065F46',
+    lineHeight: 22,
+  },
+  solutionExplanation: {
+    fontSize: 14,
+    color: '#047857',
+    lineHeight: 22,
+    marginTop: 8,
+  },
+
+  // 틀린 포인트
+  wrongPointContainer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  wrongPointHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  wrongPointIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  wrongPointLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  myAnswerBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
+  myAnswerLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  myAnswerText: {
+    fontSize: 14,
+    color: '#991B1B',
+    textDecorationLine: 'line-through',
+  },
+  reasonBox: {
+    marginBottom: 10,
+  },
+  reasonLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#D97706',
+    marginBottom: 4,
+  },
+  reasonText: {
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 22,
+  },
+  correctionBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+  },
+  correctionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+    marginBottom: 4,
+  },
+  correctionText: {
+    fontSize: 14,
+    color: '#065F46',
+    lineHeight: 22,
+  },
+
+  // 관련 개념
+  conceptContainer: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  conceptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  conceptIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  conceptTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4338CA',
+  },
+  conceptContent: {
+    fontSize: 15,
+    color: '#3730A3',
+    lineHeight: 24,
+  },
+  relatedFormulas: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#C7D2FE',
+  },
+  formulasLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6366F1',
+    marginBottom: 6,
+  },
+  relatedFormula: {
+    fontSize: 14,
+    color: '#4338CA',
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+
+  // ============================================
+  // 단어장 스타일
+  // ============================================
+
+  vocabContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  vocabHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  vocabWord: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginRight: 8,
+  },
+  vocabPronunciation: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginRight: 8,
+  },
+  posBadge: {
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  posText: {
+    fontSize: 11,
+    color: '#4338CA',
+    fontWeight: '600',
+  },
+  vocabMeaning: {
+    fontSize: 17,
+    color: '#374151',
+    lineHeight: 26,
+    marginBottom: 12,
+  },
+  vocabExample: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
+  exampleSentence: {
+    fontSize: 14,
+    color: '#4B5563',
+    fontStyle: 'italic',
+    lineHeight: 22,
+  },
+  exampleTranslation: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  vocabRelated: {
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  relatedLabel: {
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  synonyms: {
+    fontSize: 13,
+    color: '#059669',
+    marginBottom: 4,
+  },
+  antonyms: {
+    fontSize: 13,
+    color: '#DC2626',
   },
 });

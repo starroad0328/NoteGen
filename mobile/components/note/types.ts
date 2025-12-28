@@ -17,7 +17,14 @@ export type NoteBlockType =
   | 'formula'    // 공식 (수학)
   | 'definition' // 정의
   | 'tip'        // 팁/주의
-  | 'divider';   // 구분선
+  | 'divider'    // 구분선
+  // 오답노트용
+  | 'problem'    // 문제
+  | 'solution'   // 풀이/정답
+  | 'wrongPoint' // 틀린 포인트
+  | 'concept'    // 관련 개념
+  // 단어장용
+  | 'vocabulary'; // 단어
 
 // 기본 블록 인터페이스
 interface BaseBlock {
@@ -109,6 +116,59 @@ export interface DividerBlock extends BaseBlock {
   type: 'divider';
 }
 
+// ============================================
+// 오답노트용 블록
+// ============================================
+
+// 문제 블록
+export interface ProblemBlock extends BaseBlock {
+  type: 'problem';
+  number?: number;           // 문제 번호
+  content: string;           // 문제 내용
+  source?: string;           // 출처 (교재명, 페이지 등)
+}
+
+// 풀이/정답 블록
+export interface SolutionBlock extends BaseBlock {
+  type: 'solution';
+  answer: string;            // 정답
+  explanation?: string;      // 풀이 과정
+  steps?: string[];          // 단계별 풀이
+}
+
+// 틀린 포인트 블록
+export interface WrongPointBlock extends BaseBlock {
+  type: 'wrongPoint';
+  myAnswer?: string;         // 내가 쓴 답
+  reason: string;            // 틀린 이유
+  correction: string;        // 올바른 접근법
+}
+
+// 관련 개념 블록
+export interface ConceptBlock extends BaseBlock {
+  type: 'concept';
+  title: string;             // 개념명
+  content: string;           // 개념 설명
+  relatedFormulas?: string[]; // 관련 공식
+}
+
+// ============================================
+// 단어장용 블록
+// ============================================
+
+// 단어 블록
+export interface VocabularyBlock extends BaseBlock {
+  type: 'vocabulary';
+  word: string;              // 단어
+  meaning: string;           // 뜻
+  pronunciation?: string;    // 발음
+  partOfSpeech?: string;     // 품사
+  exampleSentence?: string;  // 예문
+  exampleTranslation?: string; // 예문 번역
+  synonyms?: string[];       // 동의어
+  antonyms?: string[];       // 반의어
+}
+
 // 통합 블록 타입
 export type NoteBlock =
   | TitleBlock
@@ -123,7 +183,14 @@ export type NoteBlock =
   | FormulaBlock
   | DefinitionBlock
   | TipBlock
-  | DividerBlock;
+  | DividerBlock
+  // 오답노트
+  | ProblemBlock
+  | SolutionBlock
+  | WrongPointBlock
+  | ConceptBlock
+  // 단어장
+  | VocabularyBlock;
 
 // 노트 데이터 구조
 export interface NoteData {
