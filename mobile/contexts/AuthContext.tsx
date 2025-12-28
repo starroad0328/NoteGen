@@ -21,6 +21,7 @@ interface AuthContextType {
   ) => Promise<void>
   logout: () => Promise<void>
   updateUser: (data: { name?: string; school_level?: string; grade?: number }) => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -99,6 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser)
   }
 
+  const refreshUser = async () => {
+    if (!token) return
+    try {
+      const userData = await authAPI.getMe(token)
+      setUser(userData)
+    } catch (error) {
+      console.error('사용자 정보 새로고침 실패:', error)
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -109,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         updateUser,
+        refreshUser,
       }}
     >
       {children}

@@ -72,6 +72,33 @@ export interface PlansResponse {
   plans: PlanInfo[]
 }
 
+export interface SubscriptionInfo {
+  id: number
+  plan: string
+  status: string
+  provider: string
+  current_period_start: string
+  current_period_end: string
+  cancelled_at?: string
+  is_active: boolean
+}
+
+export interface VerifyPurchaseResponse {
+  success: boolean
+  message: string
+  subscription?: SubscriptionInfo
+  new_plan?: string
+}
+
+export interface PaymentHistory {
+  id: number
+  amount: number
+  currency: string
+  plan: string
+  status: string
+  created_at: string
+}
+
 export interface ProcessResponse {
   note_id: number
   status: string
@@ -234,6 +261,67 @@ export const authAPI = {
     const response = await apiClient.get('/api/auth/plans', {
       headers: { Authorization: `Bearer ${token}` },
     })
+    return response.data
+  },
+}
+
+/**
+ * 결제 API
+ */
+export const paymentAPI = {
+  verifyPurchase: async (
+    token: string,
+    purchaseToken: string,
+    productId: string
+  ): Promise<VerifyPurchaseResponse> => {
+    const response = await apiClient.post(
+      '/api/payment/verify-purchase',
+      {
+        purchase_token: purchaseToken,
+        product_id: productId,
+        package_name: 'com.notegen.app',
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
+    return response.data
+  },
+
+  getSubscription: async (token: string): Promise<SubscriptionInfo | null> => {
+    const response = await apiClient.get('/api/payment/subscription', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  cancelSubscription: async (token: string): Promise<{ message: string; expires_at: string }> => {
+    const response = await apiClient.post(
+      '/api/payment/subscription/cancel',
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
+    return response.data
+  },
+
+  getHistory: async (token: string, limit: number = 20): Promise<PaymentHistory[]> => {
+    const response = await apiClient.get('/api/payment/history', {
+      params: { limit },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  restorePurchases: async (token: string): Promise<{ restored: boolean; plan: string; message: string }> => {
+    const response = await apiClient.post(
+      '/api/payment/restore',
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
     return response.data
   },
 }

@@ -48,8 +48,8 @@ export default function MyTab() {
     ])
   }
 
-  const handleUpgrade = (planId: string) => {
-    Alert.alert('업그레이드', '결제 시스템은 준비 중입니다.\n곧 출시 예정이에요!', [{ text: '확인' }])
+  const handleUpgrade = () => {
+    router.push('/upgrade')
   }
 
   if (authLoading || loading) {
@@ -151,7 +151,7 @@ export default function MyTab() {
 
         {/* 플랜 업그레이드 */}
         {plansData?.current_plan === 'free' && (
-          <TouchableOpacity style={styles.upgradeCard} onPress={() => handleUpgrade('basic')}>
+          <TouchableOpacity style={styles.upgradeCard} onPress={handleUpgrade}>
             <View style={styles.upgradeInfo}>
               <Text style={styles.upgradeTitle}>Basic으로 업그레이드</Text>
               <Text style={styles.upgradeDesc}>월 100회 + GPT-5 모델</Text>
@@ -170,7 +170,7 @@ export default function MyTab() {
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => handleUpgrade('pro')}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleUpgrade}>
             <Text style={styles.menuIcon}>💎</Text>
             <Text style={styles.menuText}>플랜 관리</Text>
             <Text style={styles.menuArrow}>›</Text>
