@@ -1,0 +1,115 @@
+===============================================================
+         NoteGen 개발 일지 - 2025년 12월 28일 (3)
+===============================================================
+
+[ 작업 브랜치 ]
+main (직접 작업)
+
+
+-----------------------------------------------------------
+ 1. NotioClass 리브랜딩
+-----------------------------------------------------------
+
+앱 이름 변경:
+  - NoteGen -> NotioClass
+  - 슬로건: "Upload your notes. Study with them."
+
+app.json 변경사항:
+  - name: "NotioClass"
+  - slug: "notioclass"
+  - ios.bundleIdentifier: "com.notioclass.app"
+  - android.package: "com.notioclass.app"
+  - scheme: "notioclass"
+  - splash.backgroundColor: "#FDF6E3"
+
+
+-----------------------------------------------------------
+ 2. 앱 에셋 교체
+-----------------------------------------------------------
+
+사용자 제공 이미지로 교체:
+  - icon.png: NotioClass 로고 (오렌지/베이지 테마)
+  - splash.png: 물결 배경 + NotioClass 로고
+  - favicon.png: 원형 로고
+
+브랜드 컬러:
+  - 배경: #FDF6E3 (따뜻한 크림색)
+  - 메인: #C4956A (갈색)
+  - 진한: #A67B5B (진한 갈색)
+  - 강조: #E8B866 (골드/오렌지)
+  - 텍스트: #5D4E37 (갈색)
+  - 연한 텍스트: #8B7355
+
+
+-----------------------------------------------------------
+ 3. 홈 화면 UI 업데이트
+-----------------------------------------------------------
+
+app/(tabs)/index.tsx 변경:
+  - 기존 파란색 테마 -> NotioClass 갈색 테마
+  - COLORS 객체 새로 정의
+  - 비로그인 화면: "NotioClass" 타이틀 + 새 슬로건
+  - 메인 CTA 버튼: 갈색 배경 + 그림자
+  - 사용량 알약: 갈색 배경, 경고 시 골드색
+
+
+-----------------------------------------------------------
+ 4. Google Play IAP Mock 구현
+-----------------------------------------------------------
+
+문제:
+  - react-native-iap가 react-native-nitro-modules 의존
+  - Nitro Modules는 New Architecture + 네이티브 빌드 필요
+  - Expo Go에서는 작동 불가
+
+해결:
+  - react-native-iap, react-native-nitro-modules 패키지 제거
+  - services/iap.ts를 mock 구현으로 대체
+
+Mock 기능:
+  - Constants.appOwnership으로 Expo Go 감지
+  - Mock 상품 데이터 반환 (Basic/Pro 월간/연간)
+  - Mock 구매: Alert으로 테스트 구매 시뮬레이션
+  - 실제 IAP는 개발 빌드(EAS Build) 시 구현 예정
+
+상품 ID 변경:
+  - notegen_* -> notioclass_*
+  - notioclass_basic_monthly
+  - notioclass_basic_yearly
+  - notioclass_pro_monthly
+  - notioclass_pro_yearly
+
+
+-----------------------------------------------------------
+ 5. 변경된 파일
+-----------------------------------------------------------
+
+수정:
+  - mobile/app.json (리브랜딩)
+  - mobile/app/(tabs)/index.tsx (홈 UI)
+  - mobile/services/iap.ts (Mock 구현)
+  - mobile/assets/icon.png (새 아이콘)
+  - mobile/assets/splash.png (새 스플래시)
+  - mobile/assets/favicon.png (새 파비콘)
+
+삭제된 패키지:
+  - react-native-iap
+  - react-native-nitro-modules
+
+
+-----------------------------------------------------------
+ 6. 현재 상태
+-----------------------------------------------------------
+
+정상 작동:
+  - 모바일 앱 (Metro 번들러)
+  - 홈 화면 (NotioClass 브랜딩)
+  - 업그레이드 화면 (Mock IAP)
+
+다음 작업:
+  - 다른 화면들도 NotioClass 컬러 적용 (notes, upload, my)
+  - EAS Build 설정 (실제 IAP 테스트용)
+  - Google Play Console 상품 등록
+
+
+===============================================================

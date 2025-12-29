@@ -7,11 +7,13 @@ import { useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { notesAPI, authAPI, Note, UsageInfo } from '../../services/api'
 
 export default function HomeTab() {
   const router = useRouter()
   const { user, token, loading: authLoading } = useAuth()
+  const { colors } = useTheme()
   const [recentNotes, setRecentNotes] = useState<Note[]>([])
   const [usage, setUsage] = useState<UsageInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,8 +52,8 @@ export default function HomeTab() {
 
   if (authLoading || loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>로딩 중...</Text>
       </View>
     )
   }
@@ -59,22 +61,22 @@ export default function HomeTab() {
   // 비로그인 상태
   if (!user) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.heroEmoji}>📝</Text>
-        <Text style={styles.heroTitle}>NotioClass</Text>
-        <Text style={styles.heroSubtitle}>Upload your notes. Study with them.</Text>
+        <Text style={[styles.heroTitle, { color: colors.text }]}>NotioClass</Text>
+        <Text style={[styles.heroSubtitle, { color: colors.textLight }]}>Upload your notes. Study with them.</Text>
 
         <View style={styles.featureList}>
-          <Text style={styles.featureItem}>사진 찍으면 자동 정리</Text>
-          <Text style={styles.featureItem}>코넬식, 오답노트, 단어장</Text>
-          <Text style={styles.featureItem}>시험 대비 문제 자동 생성</Text>
+          <Text style={[styles.featureItem, { color: colors.textLight }]}>사진 찍으면 자동 정리</Text>
+          <Text style={[styles.featureItem, { color: colors.textLight }]}>코넬식, 오답노트, 단어장</Text>
+          <Text style={[styles.featureItem, { color: colors.textLight }]}>시험 대비 문제 자동 생성</Text>
         </View>
 
-        <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
+        <TouchableOpacity style={[styles.loginButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/login')}>
           <Text style={styles.loginButtonText}>시작하기</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.registerLink} onPress={() => router.push('/register')}>
-          <Text style={styles.registerLinkText}>계정이 없으신가요? 회원가입</Text>
+          <Text style={[styles.registerLinkText, { color: colors.primary }]}>계정이 없으신가요? 회원가입</Text>
         </TouchableOpacity>
       </View>
     )
@@ -82,7 +84,7 @@ export default function HomeTab() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -91,13 +93,13 @@ export default function HomeTab() {
         {/* 헤더 */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>안녕하세요, {user.name || '학생'}님</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>안녕하세요, {user.name || '학생'}님</Text>
             {user.grade_display && (
-              <Text style={styles.gradeText}>{user.grade_display}</Text>
+              <Text style={[styles.gradeText, { color: colors.primary }]}>{user.grade_display}</Text>
             )}
           </View>
           {usage && !usage.is_unlimited && (
-            <View style={[styles.usagePill, usage.remaining <= 3 && styles.usagePillWarning]}>
+            <View style={[styles.usagePill, { backgroundColor: colors.primary }, usage.remaining <= 3 && { backgroundColor: colors.accent }]}>
               <Text style={styles.usagePillText}>{usage.remaining}회 남음</Text>
             </View>
           )}
@@ -105,7 +107,7 @@ export default function HomeTab() {
 
         {/* 메인 CTA */}
         <TouchableOpacity
-          style={styles.mainCTA}
+          style={[styles.mainCTA, { backgroundColor: colors.primary, shadowColor: colors.primaryDark }]}
           onPress={() => router.push('/(tabs)/upload')}
         >
           <Text style={styles.mainCTAIcon}>📸</Text>
@@ -119,25 +121,25 @@ export default function HomeTab() {
         {/* 빠른 액션 */}
         <View style={styles.quickActions}>
           <TouchableOpacity
-            style={styles.quickAction}
+            style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
             onPress={() => router.push('/(tabs)/notes')}
           >
             <Text style={styles.quickActionIcon}>📚</Text>
-            <Text style={styles.quickActionText}>내 노트</Text>
+            <Text style={[styles.quickActionText, { color: colors.text }]}>내 노트</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.quickAction}
+            style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
             onPress={() => router.push('/(tabs)/practice')}
           >
             <Text style={styles.quickActionIcon}>🧠</Text>
-            <Text style={styles.quickActionText}>문제 풀기</Text>
+            <Text style={[styles.quickActionText, { color: colors.text }]}>문제 풀기</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.quickAction}
+            style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
             onPress={() => router.push('/(tabs)/my')}
           >
             <Text style={styles.quickActionIcon}>💎</Text>
-            <Text style={styles.quickActionText}>내 플랜</Text>
+            <Text style={[styles.quickActionText, { color: colors.text }]}>내 플랜</Text>
           </TouchableOpacity>
         </View>
 
@@ -145,24 +147,24 @@ export default function HomeTab() {
         {recentNotes.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>최근 정리</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>최근 정리</Text>
               <TouchableOpacity onPress={() => router.push('/(tabs)/notes')}>
-                <Text style={styles.sectionMore}>전체보기</Text>
+                <Text style={[styles.sectionMore, { color: colors.primary }]}>전체보기</Text>
               </TouchableOpacity>
             </View>
             {recentNotes.map((note) => (
               <TouchableOpacity
                 key={note.id}
-                style={styles.noteCard}
+                style={[styles.noteCard, { backgroundColor: colors.cardBg }]}
                 onPress={() => router.push(`/notes/${note.id}`)}
               >
                 <View style={styles.noteInfo}>
-                  <Text style={styles.noteTitle} numberOfLines={1}>{note.title}</Text>
-                  <Text style={styles.noteDate}>
+                  <Text style={[styles.noteTitle, { color: colors.text }]} numberOfLines={1}>{note.title}</Text>
+                  <Text style={[styles.noteDate, { color: colors.textLight }]}>
                     {new Date(note.created_at).toLocaleDateString('ko-KR')}
                   </Text>
                 </View>
-                <Text style={styles.noteArrow}>›</Text>
+                <Text style={[styles.noteArrow, { color: colors.primary }]}>›</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -172,8 +174,8 @@ export default function HomeTab() {
         {recentNotes.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📝</Text>
-            <Text style={styles.emptyTitle}>아직 정리한 노트가 없어요</Text>
-            <Text style={styles.emptyDesc}>첫 필기를 정리해보세요!</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>아직 정리한 노트가 없어요</Text>
+            <Text style={[styles.emptyDesc, { color: colors.textLight }]}>첫 필기를 정리해보세요!</Text>
           </View>
         )}
       </View>
@@ -181,26 +183,12 @@ export default function HomeTab() {
   )
 }
 
-// NotioClass 브랜드 컬러
-const COLORS = {
-  background: '#FDF6E3',      // 따뜻한 크림색
-  primary: '#C4956A',         // 갈색 메인
-  primaryDark: '#A67B5B',     // 진한 갈색
-  accent: '#E8B866',          // 골드/오렌지
-  text: '#5D4E37',            // 갈색 텍스트
-  textLight: '#8B7355',       // 연한 갈색
-  cardBg: '#FFFEF8',          // 카드 배경
-  white: '#FFFFFF',
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
@@ -211,7 +199,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: COLORS.textLight,
   },
 
   // 비로그인 히어로
@@ -222,12 +209,10 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.text,
     marginBottom: 8,
   },
   heroSubtitle: {
     fontSize: 16,
-    color: COLORS.textLight,
     marginBottom: 32,
   },
   featureList: {
@@ -235,12 +220,10 @@ const styles = StyleSheet.create({
   },
   featureItem: {
     fontSize: 15,
-    color: COLORS.textLight,
     marginBottom: 8,
     textAlign: 'center',
   },
   loginButton: {
-    backgroundColor: COLORS.primary,
     paddingHorizontal: 64,
     paddingVertical: 16,
     borderRadius: 12,
@@ -255,7 +238,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   registerLinkText: {
-    color: COLORS.primary,
     fontSize: 14,
   },
 
@@ -269,22 +251,16 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: COLORS.text,
   },
   gradeText: {
     fontSize: 14,
-    color: COLORS.primary,
     fontWeight: '500',
     marginTop: 2,
   },
   usagePill: {
-    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-  },
-  usagePillWarning: {
-    backgroundColor: COLORS.accent,
   },
   usagePillText: {
     color: 'white',
@@ -294,13 +270,11 @@ const styles = StyleSheet.create({
 
   // 메인 CTA
   mainCTA: {
-    backgroundColor: COLORS.primary,
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -337,15 +311,9 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     flex: 1,
-    backgroundColor: COLORS.cardBg,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
   },
   quickActionIcon: {
     fontSize: 24,
@@ -353,7 +321,6 @@ const styles = StyleSheet.create({
   },
   quickActionText: {
     fontSize: 13,
-    color: COLORS.text,
     fontWeight: '500',
   },
 
@@ -370,26 +337,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.text,
   },
   sectionMore: {
     fontSize: 14,
-    color: COLORS.primary,
   },
 
   // 노트 카드
   noteCard: {
-    backgroundColor: COLORS.cardBg,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   noteInfo: {
     flex: 1,
@@ -397,16 +356,13 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: COLORS.text,
     marginBottom: 2,
   },
   noteDate: {
     fontSize: 12,
-    color: COLORS.textLight,
   },
   noteArrow: {
     fontSize: 20,
-    color: COLORS.primary,
   },
 
   // 빈 상태
@@ -421,11 +377,9 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: COLORS.text,
     marginBottom: 4,
   },
   emptyDesc: {
     fontSize: 14,
-    color: COLORS.textLight,
   },
 })

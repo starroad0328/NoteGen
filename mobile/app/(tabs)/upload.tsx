@@ -8,10 +8,12 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { uploadAPI, authAPI, UsageInfo } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 
 export default function HomeTab() {
   const router = useRouter()
   const { user, token, loading } = useAuth()
+  const { colors } = useTheme()
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
   const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'error_note' | 'vocab'>('basic_summary')
   const [uploading, setUploading] = useState(false)
@@ -103,28 +105,28 @@ export default function HomeTab() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>로딩 중...</Text>
       </View>
     )
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         {/* 헤더 */}
         <View style={styles.header}>
           <Text style={styles.logo}>📝</Text>
-          <Text style={styles.title}>필기 정리</Text>
+          <Text style={[styles.title, { color: colors.text }]}>필기 정리</Text>
           <View style={styles.badgeRow}>
             {user?.grade_display && (
-              <View style={styles.gradeBadge}>
+              <View style={[styles.gradeBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.gradeBadgeText}>{user.grade_display}</Text>
               </View>
             )}
             {usage && !usage.is_unlimited && (
               <TouchableOpacity
-                style={[styles.usageBadge, usage.remaining === 0 && styles.usageBadgeDanger]}
+                style={[styles.usageBadge, { backgroundColor: colors.primary }, usage.remaining === 0 && { backgroundColor: colors.accent }]}
                 onPress={() => router.push('/(tabs)/plan')}
               >
                 <Text style={styles.usageBadgeText}>
@@ -136,22 +138,22 @@ export default function HomeTab() {
         </View>
 
         {!user && (
-          <TouchableOpacity style={styles.loginBanner} onPress={() => router.push('/login')}>
+          <TouchableOpacity style={[styles.loginBanner, { backgroundColor: colors.primary }]} onPress={() => router.push('/login')}>
             <Text style={styles.loginBannerText}>로그인하고 필기 정리 시작하기</Text>
           </TouchableOpacity>
         )}
 
         {/* 이미지 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>이미지 선택</Text>
+        <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>이미지 선택</Text>
           <View style={styles.imageButtons}>
             <TouchableOpacity style={styles.imageButton} onPress={takePhoto}>
               <Text style={styles.imageButtonIcon}>📸</Text>
-              <Text style={styles.imageButtonText}>사진 촬영</Text>
+              <Text style={[styles.imageButtonText, { color: colors.text }]}>사진 촬영</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
               <Text style={styles.imageButtonIcon}>🖼️</Text>
-              <Text style={styles.imageButtonText}>갤러리</Text>
+              <Text style={[styles.imageButtonText, { color: colors.text }]}>갤러리</Text>
             </TouchableOpacity>
           </View>
 
@@ -167,57 +169,57 @@ export default function HomeTab() {
               ))}
             </View>
           )}
-          <Text style={styles.hint}>최대 3개 ({images.length}/3)</Text>
+          <Text style={[styles.hint, { color: colors.textLight }]}>최대 3개 ({images.length}/3)</Text>
         </View>
 
         {/* 정리 방식 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>정리 방식</Text>
+        <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>정리 방식</Text>
           <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'basic_summary' && styles.methodCardSelected]}
+            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'basic_summary' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
             onPress={() => setOrganizeMethod('basic_summary')}
           >
             <Text style={styles.methodIcon}>📋</Text>
             <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>기본 요약 정리</Text>
-              <Text style={styles.methodDesc}>핵심 내용을 간결하게 정리</Text>
+              <Text style={[styles.methodTitle, { color: colors.text }]}>기본 요약 정리</Text>
+              <Text style={[styles.methodDesc, { color: colors.textLight }]}>핵심 내용을 간결하게 정리</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'cornell' && styles.methodCardSelected]}
+            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'cornell' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
             onPress={() => setOrganizeMethod('cornell')}
           >
             <Text style={styles.methodIcon}>📐</Text>
             <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>코넬식 정리</Text>
-              <Text style={styles.methodDesc}>키워드 + 본문 + 요약 구조</Text>
+              <Text style={[styles.methodTitle, { color: colors.text }]}>코넬식 정리</Text>
+              <Text style={[styles.methodDesc, { color: colors.textLight }]}>키워드 + 본문 + 요약 구조</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'error_note' && styles.methodCardSelected]}
+            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'error_note' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
             onPress={() => setOrganizeMethod('error_note')}
           >
             <Text style={styles.methodIcon}>❌</Text>
             <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>오답노트</Text>
-              <Text style={styles.methodDesc}>문제 + 오답 + 정답 + 해설</Text>
+              <Text style={[styles.methodTitle, { color: colors.text }]}>오답노트</Text>
+              <Text style={[styles.methodDesc, { color: colors.textLight }]}>문제 + 오답 + 정답 + 해설</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.methodCard, organizeMethod === 'vocab' && styles.methodCardSelected]}
+            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'vocab' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
             onPress={() => setOrganizeMethod('vocab')}
           >
             <Text style={styles.methodIcon}>📚</Text>
             <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>단어장</Text>
-              <Text style={styles.methodDesc}>단어 + 뜻 + 예문 표 정리</Text>
+              <Text style={[styles.methodTitle, { color: colors.text }]}>단어장</Text>
+              <Text style={[styles.methodDesc, { color: colors.textLight }]}>단어 + 뜻 + 예문 표 정리</Text>
             </View>
           </TouchableOpacity>
         </View>
 
         {/* 정리 시작 버튼 */}
         <TouchableOpacity
-          style={[styles.uploadButton, (uploading || images.length === 0) && styles.uploadButtonDisabled]}
+          style={[styles.uploadButton, { backgroundColor: colors.primary, shadowColor: colors.primaryDark }, (uploading || images.length === 0) && styles.uploadButtonDisabled]}
           onPress={handleUpload}
           disabled={uploading || images.length === 0}
         >
@@ -233,7 +235,6 @@ export default function HomeTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
   },
   content: {
     padding: 20,
@@ -242,7 +243,6 @@ const styles = StyleSheet.create({
   loadingText: {
     textAlign: 'center',
     marginTop: 100,
-    color: '#666',
   },
   header: {
     alignItems: 'center',
@@ -255,7 +255,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2C2C2C',
     marginBottom: 8,
   },
   badgeRow: {
@@ -263,7 +262,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   gradeBadge: {
-    backgroundColor: '#10B981',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -274,13 +272,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   usageBadge: {
-    backgroundColor: '#3B82F6',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-  },
-  usageBadgeDanger: {
-    backgroundColor: '#EF4444',
   },
   usageBadgeText: {
     color: 'white',
@@ -288,7 +282,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loginBanner: {
-    backgroundColor: '#3B82F6',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -300,15 +293,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   section: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   sectionTitle: {
     fontSize: 16,
@@ -321,7 +308,7 @@ const styles = StyleSheet.create({
   },
   imageButton: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
@@ -332,7 +319,6 @@ const styles = StyleSheet.create({
   },
   imageButtonText: {
     fontSize: 14,
-    color: '#333',
     fontWeight: '500',
   },
   imageList: {
@@ -367,21 +353,15 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 12,
-    color: '#888',
     marginTop: 8,
   },
   methodCard: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-  },
-  methodCardSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
   },
   methodIcon: {
     fontSize: 28,
@@ -397,17 +377,21 @@ const styles = StyleSheet.create({
   },
   methodDesc: {
     fontSize: 12,
-    color: '#666',
   },
   uploadButton: {
-    backgroundColor: '#3B82F6',
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 40,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   uploadButtonDisabled: {
     backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   uploadButtonText: {
     color: 'white',

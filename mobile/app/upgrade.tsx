@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { authAPI, PlansResponse } from '../services/api'
 import { iapService, PRODUCT_IDS, ProductInfo } from '../services/iap'
 
@@ -22,6 +23,7 @@ type BillingPeriod = 'monthly' | 'yearly'
 export default function UpgradeScreen() {
   const router = useRouter()
   const { user, token, refreshUser } = useAuth()
+  const { colors } = useTheme()
   const [plansData, setPlansData] = useState<PlansResponse | null>(null)
   const [products, setProducts] = useState<ProductInfo[]>([])
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro'>('basic')
@@ -141,47 +143,48 @@ export default function UpgradeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>로딩 중...</Text>
       </View>
     )
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         {/* 헤더 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>{'<'} 뒤로</Text>
+            <Text style={[styles.backButtonText, { color: colors.primary }]}>← 뒤로</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>플랜 업그레이드</Text>
+          <Text style={[styles.title, { color: colors.text }]}>플랜 업그레이드</Text>
         </View>
 
         {/* 현재 플랜 */}
         {plansData && (
-          <View style={styles.currentPlanCard}>
-            <Text style={styles.currentPlanLabel}>현재 플랜</Text>
-            <Text style={styles.currentPlanName}>
+          <View style={[styles.currentPlanCard, { backgroundColor: colors.cardBg }]}>
+            <Text style={[styles.currentPlanLabel, { color: colors.textLight }]}>현재 플랜</Text>
+            <Text style={[styles.currentPlanName, { color: colors.primary }]}>
               {plansData.current_plan.toUpperCase()}
             </Text>
           </View>
         )}
 
         {/* 결제 주기 선택 */}
-        <View style={styles.periodToggle}>
+        <View style={[styles.periodToggle, { backgroundColor: colors.tabBarBorder }]}>
           <TouchableOpacity
             style={[
               styles.periodButton,
-              billingPeriod === 'monthly' && styles.periodButtonActive,
+              billingPeriod === 'monthly' && [styles.periodButtonActive, { backgroundColor: colors.cardBg }],
             ]}
             onPress={() => setBillingPeriod('monthly')}
           >
             <Text
               style={[
                 styles.periodButtonText,
-                billingPeriod === 'monthly' && styles.periodButtonTextActive,
+                { color: colors.textLight },
+                billingPeriod === 'monthly' && { color: colors.text, fontWeight: '600' },
               ]}
             >
               월간
@@ -190,14 +193,15 @@ export default function UpgradeScreen() {
           <TouchableOpacity
             style={[
               styles.periodButton,
-              billingPeriod === 'yearly' && styles.periodButtonActive,
+              billingPeriod === 'yearly' && [styles.periodButtonActive, { backgroundColor: colors.cardBg }],
             ]}
             onPress={() => setBillingPeriod('yearly')}
           >
             <Text
               style={[
                 styles.periodButtonText,
-                billingPeriod === 'yearly' && styles.periodButtonTextActive,
+                { color: colors.textLight },
+                billingPeriod === 'yearly' && { color: colors.text, fontWeight: '600' },
               ]}
             >
               연간 (17% 할인)
@@ -211,24 +215,25 @@ export default function UpgradeScreen() {
           <TouchableOpacity
             style={[
               styles.planCard,
-              selectedPlan === 'basic' && styles.planCardSelected,
+              { backgroundColor: colors.cardBg, borderColor: colors.tabBarBorder },
+              selectedPlan === 'basic' && { borderColor: colors.primary, backgroundColor: colors.background },
             ]}
             onPress={() => setSelectedPlan('basic')}
           >
             <View style={styles.planHeader}>
-              <Text style={styles.planName}>Basic</Text>
-              <Text style={styles.planPrice}>
+              <Text style={[styles.planName, { color: colors.text }]}>Basic</Text>
+              <Text style={[styles.planPrice, { color: colors.primary }]}>
                 {billingPeriod === 'monthly' ? '6,990원/월' : '69,900원/년'}
               </Text>
             </View>
             <View style={styles.planFeatures}>
-              <Text style={styles.feature}>월 100회 정리</Text>
-              <Text style={styles.feature}>GPT-5 mini 모델</Text>
-              <Text style={styles.feature}>단어 추출 + 예문 생성</Text>
-              <Text style={styles.feature}>비교표 생성</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>월 100회 정리</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>GPT-5 mini 모델</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>단어 추출 + 예문 생성</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>비교표 생성</Text>
             </View>
             {selectedPlan === 'basic' && (
-              <View style={styles.selectedBadge}>
+              <View style={[styles.selectedBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.selectedBadgeText}>선택됨</Text>
               </View>
             )}
@@ -238,8 +243,8 @@ export default function UpgradeScreen() {
           <TouchableOpacity
             style={[
               styles.planCard,
-              styles.planCardPro,
-              selectedPlan === 'pro' && styles.planCardSelected,
+              { backgroundColor: colors.cardBg, borderColor: '#8B5CF6' },
+              selectedPlan === 'pro' && { borderColor: colors.primary, backgroundColor: colors.background },
             ]}
             onPress={() => setSelectedPlan('pro')}
           >
@@ -247,20 +252,20 @@ export default function UpgradeScreen() {
               <Text style={styles.popularBadgeText}>인기</Text>
             </View>
             <View style={styles.planHeader}>
-              <Text style={styles.planName}>Pro</Text>
-              <Text style={styles.planPrice}>
+              <Text style={[styles.planName, { color: colors.text }]}>Pro</Text>
+              <Text style={[styles.planPrice, { color: colors.primary }]}>
                 {billingPeriod === 'monthly' ? '14,900원/월' : '149,000원/년'}
               </Text>
             </View>
             <View style={styles.planFeatures}>
-              <Text style={styles.feature}>무제한 정리</Text>
-              <Text style={styles.feature}>GPT-5.2 모델 (최고급)</Text>
-              <Text style={styles.feature}>시험형 문제 생성 (20개)</Text>
-              <Text style={styles.feature}>출제자 관점 분석</Text>
-              <Text style={styles.feature}>압축 노트 생성</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>무제한 정리</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>GPT-5.2 모델 (최고급)</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>시험형 문제 생성 (20개)</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>출제자 관점 분석</Text>
+              <Text style={[styles.feature, { color: colors.textLight }]}>압축 노트 생성</Text>
             </View>
             {selectedPlan === 'pro' && (
-              <View style={styles.selectedBadge}>
+              <View style={[styles.selectedBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.selectedBadgeText}>선택됨</Text>
               </View>
             )}
@@ -269,7 +274,11 @@ export default function UpgradeScreen() {
 
         {/* 구매 버튼 */}
         <TouchableOpacity
-          style={[styles.purchaseButton, purchasing && styles.purchaseButtonDisabled]}
+          style={[
+            styles.purchaseButton,
+            { backgroundColor: colors.primary },
+            purchasing && styles.purchaseButtonDisabled,
+          ]}
           onPress={handlePurchase}
           disabled={purchasing}
         >
@@ -284,12 +293,12 @@ export default function UpgradeScreen() {
 
         {/* 구매 복원 */}
         <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
-          <Text style={styles.restoreButtonText}>구매 복원</Text>
+          <Text style={[styles.restoreButtonText, { color: colors.textLight }]}>구매 복원</Text>
         </TouchableOpacity>
 
         {/* 안내 문구 */}
-        <View style={styles.notice}>
-          <Text style={styles.noticeText}>
+        <View style={[styles.notice, { backgroundColor: colors.cardBg }]}>
+          <Text style={[styles.noticeText, { color: colors.textLight }]}>
             구독은 Google Play를 통해 자동 갱신됩니다.{'\n'}
             언제든지 Google Play 설정에서 구독을 취소할 수 있습니다.
           </Text>
@@ -302,17 +311,14 @@ export default function UpgradeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
   },
   content: {
     padding: 20,
@@ -325,16 +331,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backButtonText: {
-    color: '#3B82F6',
     fontSize: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1F2937',
   },
   currentPlanCard: {
-    backgroundColor: '#EFF6FF',
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
@@ -344,16 +347,13 @@ const styles = StyleSheet.create({
   },
   currentPlanLabel: {
     fontSize: 14,
-    color: '#6B7280',
   },
   currentPlanName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#3B82F6',
   },
   periodToggle: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
     borderRadius: 12,
     padding: 4,
     marginBottom: 24,
@@ -365,7 +365,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   periodButtonActive: {
-    backgroundColor: 'white',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -374,30 +373,16 @@ const styles = StyleSheet.create({
   },
   periodButtonText: {
     fontSize: 14,
-    color: '#6B7280',
     fontWeight: '500',
-  },
-  periodButtonTextActive: {
-    color: '#1F2937',
-    fontWeight: '600',
   },
   plansContainer: {
     gap: 16,
     marginBottom: 24,
   },
   planCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  planCardPro: {
-    borderColor: '#8B5CF6',
-  },
-  planCardSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
   },
   popularBadge: {
     position: 'absolute',
@@ -419,27 +404,23 @@ const styles = StyleSheet.create({
   planName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
     marginBottom: 4,
   },
   planPrice: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#3B82F6',
   },
   planFeatures: {
     gap: 8,
   },
   feature: {
     fontSize: 14,
-    color: '#4B5563',
     paddingLeft: 16,
   },
   selectedBadge: {
     position: 'absolute',
     top: 16,
     right: 16,
-    backgroundColor: '#3B82F6',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -450,14 +431,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   purchaseButton: {
-    backgroundColor: '#3B82F6',
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
   purchaseButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
   },
   purchaseButtonText: {
     color: 'white',
@@ -470,18 +450,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   restoreButtonText: {
-    color: '#6B7280',
     fontSize: 14,
   },
   notice: {
     padding: 16,
-    backgroundColor: '#F9FAFB',
     borderRadius: 12,
     marginBottom: 40,
   },
   noticeText: {
     fontSize: 12,
-    color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 18,
   },

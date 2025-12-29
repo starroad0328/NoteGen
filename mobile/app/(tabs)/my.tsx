@@ -1,17 +1,19 @@
 /**
  * MY 탭
- * 프로필 + 플랜 + 설정 통합
+ * 프로필 + 플랜 + 설정 + 테마 선택
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { authAPI, PlansResponse } from '../../services/api'
 
 export default function MyTab() {
   const router = useRouter()
   const { user, token, loading: authLoading, logout } = useAuth()
+  const { colors } = useTheme()
   const [plansData, setPlansData] = useState<PlansResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -54,18 +56,18 @@ export default function MyTab() {
 
   if (authLoading || loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>로딩 중...</Text>
       </View>
     )
   }
 
   if (!user) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emoji}>👤</Text>
-        <Text style={styles.title}>로그인이 필요합니다</Text>
-        <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
+        <Text style={[styles.title, { color: colors.text }]}>로그인이 필요합니다</Text>
+        <TouchableOpacity style={[styles.loginButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/login')}>
           <Text style={styles.loginButtonText}>로그인</Text>
         </TouchableOpacity>
       </View>
@@ -79,41 +81,47 @@ export default function MyTab() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.content}>
         {/* 헤더 */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>MY</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>MY</Text>
+          <TouchableOpacity
+            style={[styles.settingsButton, { backgroundColor: colors.cardBg }]}
+            onPress={() => router.push('/settings')}
+          >
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 프로필 카드 */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
+        <View style={[styles.profileCard, { backgroundColor: colors.cardBg }]}>
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
             <Text style={styles.avatarText}>
               {user.name ? user.name[0].toUpperCase() : user.email[0].toUpperCase()}
             </Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user.name || '이름 미설정'}</Text>
-            <Text style={styles.profileEmail}>{user.email}</Text>
+            <Text style={[styles.profileName, { color: colors.text }]}>{user.name || '이름 미설정'}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textLight }]}>{user.email}</Text>
             {user.grade_display && (
-              <View style={styles.gradeBadge}>
+              <View style={[styles.gradeBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.gradeBadgeText}>{user.grade_display}</Text>
               </View>
             )}
           </View>
           <TouchableOpacity onPress={() => router.push('/profile-edit')}>
-            <Text style={styles.editText}>편집</Text>
+            <Text style={[styles.editText, { color: colors.primary }]}>편집</Text>
           </TouchableOpacity>
         </View>
 
         {/* 사용량 카드 */}
-        <View style={styles.usageCard}>
+        <View style={[styles.usageCard, { backgroundColor: colors.cardBg }]}>
           <View style={styles.usageHeader}>
-            <Text style={styles.usageTitle}>이번 달 사용량</Text>
-            <View style={[styles.planBadge, getPlanBadgeStyle(plansData?.current_plan)]}>
+            <Text style={[styles.usageTitle, { color: colors.text }]}>이번 달 사용량</Text>
+            <View style={[styles.planBadge, getPlanBadgeStyle(plansData?.current_plan, colors)]}>
               <Text style={styles.planBadgeText}>
                 {plansData?.current_plan?.toUpperCase() || 'FREE'}
               </Text>
@@ -122,27 +130,27 @@ export default function MyTab() {
 
           {usage?.is_unlimited ? (
             <View style={styles.unlimitedContainer}>
-              <Text style={styles.unlimitedText}>무제한</Text>
-              <Text style={styles.usageCount}>{usage.used}회 사용</Text>
+              <Text style={[styles.unlimitedText, { color: colors.primary }]}>무제한</Text>
+              <Text style={[styles.usageCount, { color: colors.textLight }]}>{usage.used}회 사용</Text>
             </View>
           ) : (
             <>
               <View style={styles.usageNumbers}>
-                <Text style={styles.usageUsed}>{usage?.used || 0}</Text>
-                <Text style={styles.usageSlash}>/</Text>
-                <Text style={styles.usageLimit}>{usage?.limit || 10}회</Text>
+                <Text style={[styles.usageUsed, { color: colors.text }]}>{usage?.used || 0}</Text>
+                <Text style={[styles.usageSlash, { color: colors.textLight }]}>/</Text>
+                <Text style={[styles.usageLimit, { color: colors.textLight }]}>{usage?.limit || 10}회</Text>
               </View>
-              <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarBg, { backgroundColor: colors.tabBarBorder }]}>
                 <View
                   style={[
                     styles.progressBarFill,
-                    { width: `${usagePercent}%` },
-                    usagePercent >= 80 && styles.progressBarWarning,
+                    { width: `${usagePercent}%`, backgroundColor: colors.primary },
+                    usagePercent >= 80 && { backgroundColor: colors.accent },
                     usagePercent >= 100 && styles.progressBarDanger,
                   ]}
                 />
               </View>
-              <Text style={styles.usageRemaining}>
+              <Text style={[styles.usageRemaining, { color: colors.textLight }]}>
                 {usage?.remaining === 0 ? '이번 달 사용량 소진' : `${usage?.remaining || 10}회 남음`}
               </Text>
             </>
@@ -151,81 +159,40 @@ export default function MyTab() {
 
         {/* 플랜 업그레이드 */}
         {plansData?.current_plan === 'free' && (
-          <TouchableOpacity style={styles.upgradeCard} onPress={handleUpgrade}>
+          <TouchableOpacity style={[styles.upgradeCard, { backgroundColor: colors.cardBg, borderColor: colors.tabBarBorder }]} onPress={handleUpgrade}>
             <View style={styles.upgradeInfo}>
-              <Text style={styles.upgradeTitle}>Basic으로 업그레이드</Text>
-              <Text style={styles.upgradeDesc}>월 100회 + GPT-5 모델</Text>
+              <Text style={[styles.upgradeTitle, { color: colors.primaryDark }]}>Basic으로 업그레이드</Text>
+              <Text style={[styles.upgradeDesc, { color: colors.primary }]}>월 100회 + GPT-5 모델</Text>
             </View>
-            <Text style={styles.upgradePrice}>6,990/월</Text>
+            <Text style={[styles.upgradePrice, { color: colors.primaryDark }]}>6,990/월</Text>
           </TouchableOpacity>
         )}
 
-        {/* 메뉴 */}
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>설정</Text>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile-edit')}>
-            <Text style={styles.menuIcon}>👤</Text>
-            <Text style={styles.menuText}>프로필 수정</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={handleUpgrade}>
-            <Text style={styles.menuIcon}>💎</Text>
-            <Text style={styles.menuText}>플랜 관리</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>🔔</Text>
-            <Text style={styles.menuText}>알림 설정</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>지원</Text>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>❓</Text>
-            <Text style={styles.menuText}>도움말</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>💬</Text>
-            <Text style={styles.menuText}>피드백 보내기</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* 로그아웃 */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.cardBg }]} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>로그아웃</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>NoteGen v1.0.0</Text>
+        <Text style={[styles.version, { color: colors.textLight }]}>NotioClass v1.0.0</Text>
       </View>
     </ScrollView>
   )
 }
 
-function getPlanBadgeStyle(plan?: string) {
+function getPlanBadgeStyle(plan?: string, colors?: any) {
   switch (plan) {
     case 'pro': return { backgroundColor: '#8B5CF6' }
-    case 'basic': return { backgroundColor: '#3B82F6' }
-    default: return { backgroundColor: '#10B981' }
+    case 'basic': return { backgroundColor: colors?.primary || '#C4956A' }
+    default: return { backgroundColor: colors?.accent || '#E8B866' }
   }
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
@@ -234,6 +201,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 40,
     marginBottom: 20,
   },
@@ -241,9 +211,18 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
   },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsIcon: {
+    fontSize: 22,
+  },
   loadingText: {
     fontSize: 16,
-    color: '#666',
   },
   emoji: {
     fontSize: 64,
@@ -251,11 +230,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    color: '#333',
     marginBottom: 24,
   },
   loginButton: {
-    backgroundColor: '#3B82F6',
     paddingHorizontal: 48,
     paddingVertical: 14,
     borderRadius: 12,
@@ -268,23 +245,16 @@ const styles = StyleSheet.create({
 
   // 프로필 카드
   profileCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -304,11 +274,9 @@ const styles = StyleSheet.create({
   },
   profileEmail: {
     fontSize: 13,
-    color: '#888',
     marginBottom: 6,
   },
   gradeBadge: {
-    backgroundColor: '#10B981',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -320,21 +288,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   editText: {
-    color: '#3B82F6',
     fontSize: 14,
   },
 
   // 사용량 카드
   usageCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   usageHeader: {
     flexDirection: 'row',
@@ -367,33 +328,25 @@ const styles = StyleSheet.create({
   },
   usageSlash: {
     fontSize: 20,
-    color: '#999',
     marginHorizontal: 4,
   },
   usageLimit: {
     fontSize: 16,
-    color: '#666',
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: '#E5E7EB',
     borderRadius: 3,
     marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
     borderRadius: 3,
-  },
-  progressBarWarning: {
-    backgroundColor: '#F59E0B',
   },
   progressBarDanger: {
     backgroundColor: '#EF4444',
   },
   usageRemaining: {
     fontSize: 13,
-    color: '#666',
   },
   unlimitedContainer: {
     alignItems: 'center',
@@ -402,24 +355,20 @@ const styles = StyleSheet.create({
   unlimitedText: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#8B5CF6',
   },
   usageCount: {
     fontSize: 13,
-    color: '#666',
     marginTop: 4,
   },
 
   // 업그레이드 카드
   upgradeCard: {
-    backgroundColor: '#EEF2FF',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
   },
   upgradeInfo: {
     flex: 1,
@@ -427,55 +376,18 @@ const styles = StyleSheet.create({
   upgradeTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#4338CA',
     marginBottom: 2,
   },
   upgradeDesc: {
     fontSize: 13,
-    color: '#6366F1',
   },
   upgradePrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#4338CA',
-  },
-
-  // 메뉴
-  menuSection: {
-    marginBottom: 24,
-  },
-  menuSectionTitle: {
-    fontSize: 13,
-    color: '#888',
-    fontWeight: '500',
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  menuItem: {
-    backgroundColor: 'white',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  menuIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  menuText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#333',
-  },
-  menuArrow: {
-    fontSize: 18,
-    color: '#CCC',
   },
 
   // 로그아웃
   logoutButton: {
-    backgroundColor: 'white',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -490,7 +402,6 @@ const styles = StyleSheet.create({
   },
   version: {
     textAlign: 'center',
-    color: '#AAA',
     fontSize: 12,
     marginBottom: 40,
   },

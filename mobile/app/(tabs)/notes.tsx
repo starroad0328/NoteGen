@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { notesAPI, Note, API_BASE_URL } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const CARD_MARGIN = 8
@@ -17,6 +18,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - 32 - CARD_MARGIN * (NUM_COLUMNS - 1)) / NUM_C
 export default function NotesTab() {
   const router = useRouter()
   const { user, token, loading: authLoading } = useAuth()
+  const { colors } = useTheme()
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -100,7 +102,7 @@ export default function NotesTab() {
       <TouchableOpacity
         style={[
           styles.noteCard,
-          { marginRight: index % NUM_COLUMNS === 0 ? CARD_MARGIN : 0 }
+          { marginRight: index % NUM_COLUMNS === 0 ? CARD_MARGIN : 0, backgroundColor: colors.cardBg }
         ]}
         onPress={() => router.push(`/notes/${item.id}`)}
       >
@@ -124,10 +126,10 @@ export default function NotesTab() {
 
         {/* 정보 */}
         <View style={styles.noteInfo}>
-          <Text style={styles.noteTitle} numberOfLines={2}>
+          <Text style={[styles.noteTitle, { color: colors.text }]} numberOfLines={2}>
             {item.title}
           </Text>
-          <Text style={styles.noteDate}>
+          <Text style={[styles.noteDate, { color: colors.textLight }]}>
             {new Date(item.created_at).toLocaleDateString('ko-KR', {
               month: 'short',
               day: 'numeric',
@@ -141,19 +143,19 @@ export default function NotesTab() {
 
   if (authLoading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>로딩 중...</Text>
       </View>
     )
   }
 
   if (!user) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emoji}>📚</Text>
-        <Text style={styles.emptyTitle}>로그인이 필요합니다</Text>
-        <Text style={styles.emptyDesc}>노트를 저장하고 관리하려면 로그인하세요</Text>
-        <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>로그인이 필요합니다</Text>
+        <Text style={[styles.emptyDesc, { color: colors.textLight }]}>노트를 저장하고 관리하려면 로그인하세요</Text>
+        <TouchableOpacity style={[styles.loginButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/login')}>
           <Text style={styles.loginButtonText}>로그인</Text>
         </TouchableOpacity>
       </View>
@@ -162,27 +164,27 @@ export default function NotesTab() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emoji}>📚</Text>
-        <Text style={styles.loadingText}>노트 목록을 불러오는 중...</Text>
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>노트 목록을 불러오는 중...</Text>
       </View>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>보관함</Text>
-        <Text style={styles.headerCount}>{notes.length}개의 노트</Text>
+      <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.tabBarBorder }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>보관함</Text>
+        <Text style={[styles.headerCount, { color: colors.textLight }]}>{notes.length}개의 노트</Text>
       </View>
 
       {/* 노트 목록 */}
       {notes.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emoji}>📝</Text>
-          <Text style={styles.emptyTitle}>아직 생성된 노트가 없습니다</Text>
-          <Text style={styles.emptyDesc}>필기 정리 탭에서 첫 노트를 만들어보세요</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>아직 생성된 노트가 없습니다</Text>
+          <Text style={[styles.emptyDesc, { color: colors.textLight }]}>필기 정리 탭에서 첫 노트를 만들어보세요</Text>
         </View>
       ) : (
         <FlatList
@@ -203,11 +205,9 @@ export default function NotesTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#FFFEF8',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
@@ -215,18 +215,14 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2C2C2C',
   },
   headerCount: {
     fontSize: 14,
-    color: '#888',
     marginTop: 4,
   },
   list: {
@@ -238,10 +234,8 @@ const styles = StyleSheet.create({
   },
   noteCard: {
     width: CARD_WIDTH,
-    backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -250,7 +244,7 @@ const styles = StyleSheet.create({
   thumbnailContainer: {
     width: '100%',
     height: CARD_WIDTH * 0.75,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     position: 'relative',
   },
   thumbnail: {
@@ -262,7 +256,7 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   placeholderIcon: {
     fontSize: 40,
@@ -290,13 +284,11 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2C2C2C',
     marginBottom: 4,
     lineHeight: 18,
   },
   noteDate: {
     fontSize: 11,
-    color: '#888',
     marginBottom: 4,
   },
   badge: {
@@ -308,7 +300,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2C2C2C',
+    color: '#333',
   },
   emptyContainer: {
     flex: 1,
@@ -323,22 +315,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyDesc: {
     fontSize: 14,
-    color: '#888',
     textAlign: 'center',
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
     marginTop: 12,
   },
   loginButton: {
-    backgroundColor: '#3B82F6',
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,

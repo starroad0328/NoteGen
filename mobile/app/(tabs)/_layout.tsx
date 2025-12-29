@@ -1,21 +1,26 @@
 import { Tabs } from 'expo-router'
 import { View, Text, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTheme } from '../../contexts/ThemeContext'
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets()
+  const { colors } = useTheme()
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          ...styles.tabBar,
+          backgroundColor: colors.tabBar,
+          borderTopWidth: 1,
+          borderTopColor: colors.tabBarBorder,
+          paddingTop: 8,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           height: 60 + (insets.bottom > 0 ? insets.bottom : 8),
         },
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textLight,
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
@@ -42,7 +47,11 @@ export default function TabsLayout() {
         options={{
           title: '업로드',
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.uploadButton, focused && styles.uploadButtonActive]}>
+            <View style={[
+              styles.uploadButton,
+              { backgroundColor: colors.primary, shadowColor: colors.primaryDark },
+              focused && { backgroundColor: colors.primaryDark }
+            ]}>
               <Text style={styles.uploadIcon}>➕</Text>
             </View>
           ),
@@ -72,12 +81,6 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 8,
-  },
   tabLabel: {
     fontSize: 11,
     fontWeight: '500',
@@ -86,19 +89,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
-  },
-  uploadButtonActive: {
-    backgroundColor: '#2563EB',
-    transform: [{ scale: 1.05 }],
   },
   uploadIcon: {
     fontSize: 22,

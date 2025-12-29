@@ -1,18 +1,21 @@
 /**
  * In-App Purchase Service
  * Google Play 인앱결제 처리
+ *
+ * 참고: Expo Go에서는 네이티브 모듈(react-native-iap)이 작동하지 않으므로
+ * 개발 빌드(EAS Build) 시에만 실제 IAP가 활성화됩니다.
+ * 현재는 mock 구현을 사용합니다.
  */
 
-import { Platform } from 'react-native'
-import * as RNIap from 'react-native-iap'
-import { paymentAPI } from './api'
+import { Platform, Alert } from 'react-native'
+import Constants from 'expo-constants'
 
 // Google Play 상품 ID
 export const PRODUCT_IDS = {
-  BASIC_MONTHLY: 'notegen_basic_monthly',
-  BASIC_YEARLY: 'notegen_basic_yearly',
-  PRO_MONTHLY: 'notegen_pro_monthly',
-  PRO_YEARLY: 'notegen_pro_yearly',
+  BASIC_MONTHLY: 'notioclass_basic_monthly',
+  BASIC_YEARLY: 'notioclass_basic_yearly',
+  PRO_MONTHLY: 'notioclass_pro_monthly',
+  PRO_YEARLY: 'notioclass_pro_yearly',
 }
 
 // 구독 상품 ID 목록
@@ -33,11 +36,48 @@ export interface ProductInfo {
   currency: string
 }
 
+// Expo Go 여부 확인
+const isExpoGo = Constants.appOwnership === 'expo'
+
+// Mock 상품 데이터 (개발용)
+const MOCK_PRODUCTS: ProductInfo[] = [
+  {
+    productId: PRODUCT_IDS.BASIC_MONTHLY,
+    title: 'Basic 월간',
+    description: '매월 20회 정리 가능',
+    price: '4900',
+    localizedPrice: '₩4,900',
+    currency: 'KRW',
+  },
+  {
+    productId: PRODUCT_IDS.BASIC_YEARLY,
+    title: 'Basic 연간',
+    description: '매월 20회 정리 가능 (2개월 무료)',
+    price: '49000',
+    localizedPrice: '₩49,000',
+    currency: 'KRW',
+  },
+  {
+    productId: PRODUCT_IDS.PRO_MONTHLY,
+    title: 'Pro 월간',
+    description: '무제한 정리',
+    price: '9900',
+    localizedPrice: '₩9,900',
+    currency: 'KRW',
+  },
+  {
+    productId: PRODUCT_IDS.PRO_YEARLY,
+    title: 'Pro 연간',
+    description: '무제한 정리 (2개월 무료)',
+    price: '99000',
+    localizedPrice: '₩99,000',
+    currency: 'KRW',
+  },
+]
+
 // IAP 서비스 클래스
 class IAPService {
   private initialized = false
-  private purchaseUpdateSubscription: any = null
-  private purchaseErrorSubscription: any = null
 
   /**
    * IAP 초기화
@@ -45,14 +85,23 @@ class IAPService {
   async initialize(): Promise<boolean> {
     if (this.initialized) return true
 
+    if (isExpoGo) {
+      console.log('[IAP] Expo Go에서 실행 중 - Mock 모드 사용')
+      this.initialized = true
+      return true
+    }
+
+    // 개발 빌드에서만 실제 IAP 초기화
     try {
-      // Android만 지원 (iOS는 추후 추가)
       if (Platform.OS !== 'android') {
         console.log('[IAP] iOS는 아직 지원되지 않습니다.')
         return false
       }
 
-      await RNIap.initConnection()
+      // 실제 IAP 초기화는 개발 빌드에서 구현
+      // const RNIap = require('react-native-iap')
+      // await RNIap.initConnection()
+
       this.initialized = true
       console.log('[IAP] 초기화 완료')
       return true
@@ -66,13 +115,6 @@ class IAPService {
    * 연결 종료
    */
   async endConnection(): Promise<void> {
-    if (this.purchaseUpdateSubscription) {
-      this.purchaseUpdateSubscription.remove()
-    }
-    if (this.purchaseErrorSubscription) {
-      this.purchaseErrorSubscription.remove()
-    }
-    await RNIap.endConnection()
     this.initialized = false
   }
 
@@ -84,21 +126,13 @@ class IAPService {
       await this.initialize()
     }
 
-    try {
-      const subscriptions = await RNIap.getSubscriptions({ skus: SUBSCRIPTION_SKUS })
-
-      return subscriptions.map((sub) => ({
-        productId: sub.productId,
-        title: sub.title,
-        description: sub.description,
-        price: sub.price || '0',
-        localizedPrice: sub.localizedPrice || sub.price || '0',
-        currency: sub.currency || 'KRW',
-      }))
-    } catch (error) {
-      console.error('[IAP] 상품 조회 실패:', error)
-      return []
+    if (isExpoGo) {
+      // Mock 데이터 반환
+      return MOCK_PRODUCTS
     }
+
+    // 실제 IAP에서 상품 조회 (개발 빌드용)
+    return MOCK_PRODUCTS
   }
 
   /**
@@ -114,53 +148,27 @@ class IAPService {
       await this.initialize()
     }
 
-    try {
-      // 구매 리스너 설정
-      this.purchaseUpdateSubscription = RNIap.purchaseUpdatedListener(
-        async (purchase) => {
-          console.log('[IAP] 구매 업데이트:', purchase)
-
-          const receipt = purchase.transactionReceipt
-          if (receipt) {
-            try {
-              // 백엔드에서 구매 검증
-              const result = await paymentAPI.verifyPurchase(
-                token,
-                purchase.purchaseToken || receipt,
-                purchase.productId
-              )
-
-              if (result.success) {
-                // 구매 확인 (Google Play에 알림)
-                await RNIap.finishTransaction({ purchase, isConsumable: false })
-                onSuccess(result.new_plan || 'basic')
-              } else {
-                onError(result.message)
-              }
-            } catch (error: any) {
-              console.error('[IAP] 검증 실패:', error)
-              onError(error.message || '결제 검증에 실패했습니다.')
-            }
-          }
-        }
+    if (isExpoGo) {
+      // Mock 구매 - 개발용 테스트
+      Alert.alert(
+        '개발 모드',
+        '실제 결제는 앱 빌드 후 사용 가능합니다.\n\n테스트로 구매 성공 처리하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '테스트 구매',
+            onPress: () => {
+              const plan = productId.includes('pro') ? 'pro' : 'basic'
+              onSuccess(plan)
+            },
+          },
+        ]
       )
-
-      this.purchaseErrorSubscription = RNIap.purchaseErrorListener((error) => {
-        console.error('[IAP] 구매 에러:', error)
-        if (error.code !== 'E_USER_CANCELLED') {
-          onError(error.message || '결제 중 오류가 발생했습니다.')
-        }
-      })
-
-      // 구독 구매 시작
-      await RNIap.requestSubscription({
-        sku: productId,
-        andDangerouslyFinishTransactionAutomaticallyIOS: false,
-      })
-    } catch (error: any) {
-      console.error('[IAP] 구매 시작 실패:', error)
-      onError(error.message || '결제를 시작할 수 없습니다.')
+      return
     }
+
+    // 실제 IAP 구매 (개발 빌드용)
+    onError('개발 빌드가 필요합니다.')
   }
 
   /**
@@ -171,31 +179,12 @@ class IAPService {
       await this.initialize()
     }
 
-    try {
-      // Google Play에서 구매 내역 조회
-      const purchases = await RNIap.getAvailablePurchases()
-      console.log('[IAP] 구매 내역:', purchases)
-
-      if (purchases.length > 0) {
-        // 가장 최근 구독 검증
-        const latestPurchase = purchases[purchases.length - 1]
-        const result = await paymentAPI.verifyPurchase(
-          token,
-          latestPurchase.purchaseToken || latestPurchase.transactionReceipt,
-          latestPurchase.productId
-        )
-
-        if (result.success) {
-          return { restored: true, plan: result.new_plan || 'basic' }
-        }
-      }
-
-      // 서버에서 복원 시도
-      return await paymentAPI.restorePurchases(token)
-    } catch (error) {
-      console.error('[IAP] 복원 실패:', error)
+    if (isExpoGo) {
+      // Mock - 복원할 구매 없음
       return { restored: false, plan: 'free' }
     }
+
+    return { restored: false, plan: 'free' }
   }
 
   /**
@@ -206,13 +195,11 @@ class IAPService {
       await this.initialize()
     }
 
-    try {
-      const purchases = await RNIap.getAvailablePurchases()
-      return purchases.some((p) => SUBSCRIPTION_SKUS.includes(p.productId))
-    } catch (error) {
-      console.error('[IAP] 구독 상태 확인 실패:', error)
+    if (isExpoGo) {
       return false
     }
+
+    return false
   }
 }
 
