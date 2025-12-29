@@ -91,14 +91,20 @@ class AIService:
             if on_step:
                 await on_step(1, "필기 구조 분석 중...")
 
-            analysis_result = await self._step1_analyze_structure(blocks_data, refined_text, ai_model)
+            # 교육과정 컨텍스트 생성 (1단계에서도 활용)
+            curriculum_context = get_curriculum_context(school_level, grade)
 
-            # 감지된 과목/노트타입 추출
+            analysis_result = await self._step1_analyze_structure(
+                blocks_data, refined_text, ai_model, school_level, grade, curriculum_context
+            )
+
+            # 감지된 과목/노트타입/단원 추출
             detected_subject = analysis_result.get("subject", "other")
             detected_note_type = analysis_result.get("note_type", "general")
+            detected_unit = analysis_result.get("detected_unit", "")
             structure_text = analysis_result.get("structure", "")
 
-            print(f"[AI] 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
+            print(f"[AI] 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}, 단원={detected_unit}", flush=True)
 
             # 2단계: 타입별 프롬프트로 정리 생성
             print("[AI] 2단계 시작...", flush=True)
@@ -111,8 +117,6 @@ class AIService:
                 }
                 await on_step(2, type_msg.get(detected_note_type, "AI 정리 생성 중..."))
 
-            # 교육과정 컨텍스트 생성
-            curriculum_context = get_curriculum_context(school_level, grade)
             if curriculum_context:
                 print(f"[AI] 교육과정 컨텍스트 적용: {school_level.value if school_level else ''} {grade}학년", flush=True)
 
@@ -126,7 +130,8 @@ class AIService:
             return {
                 "content": organized,
                 "detected_subject": detected_subject,
-                "detected_note_type": detected_note_type
+                "detected_note_type": detected_note_type,
+                "detected_unit": detected_unit
             }
 
         except Exception as e:
@@ -227,7 +232,10 @@ class AIService:
         self,
         blocks_data: Optional[Dict],
         ocr_text: str,
-        ai_model: AIModel
+        ai_model: AIModel,
+        school_level: Optional[SchoolLevel] = None,
+        grade: Optional[int] = None,
+        curriculum_context: str = ""
     ) -> Dict:
         """
         1단계: 필기 구조 파악 + 과목/노트타입 감지
@@ -244,8 +252,17 @@ class AIService:
             content = ocr_text
             input_desc = "(원본 텍스트)"
 
-        prompt = f"""다음 필기를 분석해주세요. {input_desc}
+        # 학년 정보 섹션 생성
+        grade_info = ""
+        if school_level and grade:
+            level_name = "중학교" if school_level == SchoolLevel.MIDDLE else "고등학교"
+            grade_info = f"\n[학습자 정보]\n{level_name} {grade}학년 학생의 필기입니다.\n"
+            if curriculum_context:
+                # 교육과정에서 과목 목록만 추출
+                grade_info += "이 학년에서 배우는 주요 단원을 참고하여 과목을 정확히 감지하세요.\n"
 
+        prompt = f"""다음 필기를 분석해주세요. {input_desc}
+{grade_info}
 [분석 항목]
 1. 과목 감지: math, english, korean, history, social, science, other 중 하나
 2. 노트 타입 감지:
@@ -253,6 +270,7 @@ class AIService:
    - error_note: 오답노트 (문제, 풀이, 정답/오답 포함)
    - vocab: 단어장 (영어 단어, 뜻, 예문)
 3. 구조 파악: 섹션, 그룹핑, 주의사항
+4. 단원 감지: 학년 교육과정에서 어떤 단원에 해당하는지
 
 [노트 타입 판단 기준]
 - error_note: "문제", "풀이", "정답", "오답", "해설", "O/X" 등 포함
@@ -266,7 +284,8 @@ class AIService:
   "note_type": "general|error_note|vocab",
   "structure": "주제 및 섹션 설명",
   "sections": ["섹션1", "섹션2"],
-  "grouping": "그룹핑 힌트"
+  "grouping": "그룹핑 힌트",
+  "detected_unit": "감지된 단원명 (예: 일차함수, 고려시대)"
 }}
 ```
 
@@ -299,7 +318,7 @@ class AIService:
         if not result or not result.strip():
             if response.choices[0].finish_reason == "length":
                 raise Exception("1단계 토큰 한도 초과")
-            return {"subject": "other", "note_type": "general", "structure": "", "sections": [], "grouping": ""}
+            return {"subject": "other", "note_type": "general", "structure": "", "sections": [], "grouping": "", "detected_unit": ""}
 
         # JSON 파싱 시도
         try:
@@ -316,7 +335,7 @@ class AIService:
         except json.JSONDecodeError as e:
             print(f"[AI] JSON 파싱 실패, fallback: {e}", flush=True)
             # 파싱 실패 시 기본값 + 원본 텍스트를 structure에 저장
-            return {"subject": "other", "note_type": "general", "structure": result, "sections": [], "grouping": ""}
+            return {"subject": "other", "note_type": "general", "structure": result, "sections": [], "grouping": "", "detected_unit": ""}
 
     def _get_prompt_for_note_type(
         self,
