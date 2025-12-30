@@ -10,7 +10,7 @@ from typing import List, Optional
 from app.core.database import get_db
 from app.models.note import Note
 from app.models.user import User
-from app.schemas.note import NoteResponse, NoteListResponse
+from app.schemas.note import NoteResponse, NoteListResponse, NoteUpdate
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -49,6 +49,7 @@ def get_image_urls(image_paths: str) -> List[str]:
 async def list_notes(
     skip: int = 0,
     limit: int = 20,
+    subject: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
@@ -57,6 +58,7 @@ async def list_notes(
 
     - **skip**: 건너뛸 노트 수
     - **limit**: 가져올 노트 수 (최대 100)
+    - **subject**: 과목 필터 (math, korean, english, 또는 all)
     """
     if limit > 100:
         limit = 100
@@ -67,6 +69,15 @@ async def list_notes(
         query = query.filter(Note.user_id == current_user.id)
     else:
         return []
+
+    # 과목 필터 적용
+    if subject and subject != "all":
+        from app.models.note import Subject as SubjectEnum
+        try:
+            subject_enum = SubjectEnum(subject)
+            query = query.filter(Note.detected_subject == subject_enum)
+        except ValueError:
+            pass  # 잘못된 과목명은 무시
 
     notes = query.order_by(Note.created_at.desc())\
         .offset(skip)\
@@ -109,6 +120,30 @@ async def get_note(
         "error_message": note.error_message,
         "image_urls": get_image_urls(note.image_paths),
     }
+
+
+@router.patch("/{note_id}")
+async def update_note(
+    note_id: int,
+    update_data: NoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """노트 제목 수정"""
+    note = db.query(Note).filter(Note.id == note_id).first()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+
+    # 권한 확인: 로그인한 사용자의 노트인지 확인
+    if current_user and note.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+
+    note.title = update_data.title
+    db.commit()
+    db.refresh(note)
+
+    return {"message": "노트 제목이 수정되었습니다.", "note_id": note_id, "title": note.title}
 
 
 @router.delete("/{note_id}")

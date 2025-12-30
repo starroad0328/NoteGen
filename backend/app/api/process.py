@@ -6,6 +6,7 @@ Note Processing Pipeline API
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 import json
+from datetime import datetime
 
 from app.core.database import get_db
 from app.models.note import Note, ProcessStatus, Subject, NoteType, OrganizeMethod
@@ -15,6 +16,28 @@ from app.services.ocr_service import ocr_service
 from app.services.ai_service import ai_service
 
 router = APIRouter()
+
+# 과목명 한글 변환
+SUBJECT_NAMES = {
+    "math": "수학",
+    "korean": "국어",
+    "english": "영어",
+    "science": "과학",
+    "social": "사회",
+    "history": "역사",
+    "other": "필기",
+}
+
+
+def generate_note_title(subject: str, unit: str = "") -> str:
+    """과목,날짜,단원 형식으로 제목 생성"""
+    subject_name = SUBJECT_NAMES.get(subject, "필기")
+    date_str = datetime.now().strftime("%y/%m/%d")
+
+    if unit and unit.strip():
+        return f"{subject_name},{date_str},{unit.strip()}"
+    else:
+        return f"{subject_name},{date_str}"
 
 
 async def process_note_pipeline(note_id: int):
@@ -119,10 +142,11 @@ async def process_note_pipeline(note_id: int):
         organized_content = result.get("content", "")
         detected_subject_str = result.get("detected_subject", "other")
         detected_note_type_str = result.get("detected_note_type", "general")
+        detected_unit = result.get("detected_unit", "")
 
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] AI result length: {len(organized_content) if organized_content else 0}\n")
-            f.write(f"[{note_id}] Detected: subject={detected_subject_str}, note_type={detected_note_type_str}\n")
+            f.write(f"[{note_id}] Detected: subject={detected_subject_str}, note_type={detected_note_type_str}, unit={detected_unit}\n")
 
         # 문자열을 Enum으로 변환
         try:
@@ -134,6 +158,9 @@ async def process_note_pipeline(note_id: int):
             note.detected_note_type = NoteType(detected_note_type_str)
         except ValueError:
             note.detected_note_type = NoteType.GENERAL
+
+        # 자동 제목 생성 (과목,날짜,단원 형식)
+        note.title = generate_note_title(detected_subject_str, detected_unit)
 
         note.organized_content = organized_content
         note.status = ProcessStatus.COMPLETED
@@ -236,6 +263,7 @@ async def reprocess_note(
         organized_content = result.get("content", "")
         detected_subject_str = result.get("detected_subject", "other")
         detected_note_type_str = result.get("detected_note_type", "general")
+        detected_unit = result.get("detected_unit", "")
 
         try:
             note.detected_subject = Subject(detected_subject_str)
@@ -246,6 +274,9 @@ async def reprocess_note(
             note.detected_note_type = NoteType(detected_note_type_str)
         except ValueError:
             note.detected_note_type = NoteType.GENERAL
+
+        # 자동 제목 생성 (과목,날짜,단원 형식)
+        note.title = generate_note_title(detected_subject_str, detected_unit)
 
         note.organized_content = organized_content
         note.status = ProcessStatus.COMPLETED

@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image, Dimensions } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image, Dimensions, Modal, TextInput, ScrollView } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { notesAPI, Note, API_BASE_URL } from '../../services/api'
@@ -23,6 +23,17 @@ export default function NotesTab() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [editModalVisible, setEditModalVisible] = useState(false)
+  const [editingNote, setEditingNote] = useState<Note | null>(null)
+  const [newTitle, setNewTitle] = useState('')
+  const [selectedSubject, setSelectedSubject] = useState('all')
+
+  const SUBJECT_FILTERS = [
+    { key: 'all', label: '전체' },
+    { key: 'math', label: '수학' },
+    { key: 'korean', label: '국어' },
+    { key: 'english', label: '영어' },
+  ]
 
   // 탭 포커스 시 새로고침 (삭제 중이 아닐 때만)
   useFocusEffect(
@@ -30,12 +41,12 @@ export default function NotesTab() {
       if (user && !isDeleting) {
         fetchNotes()
       }
-    }, [user, isDeleting])
+    }, [user, isDeleting, selectedSubject])
   )
 
   const fetchNotes = async () => {
     try {
-      const data = await notesAPI.list(0, 20, token)
+      const data = await notesAPI.list(0, 20, token, selectedSubject)
       setNotes(data)
     } catch (error) {
       console.error('노트 목록 조회 오류:', error)
@@ -43,6 +54,11 @@ export default function NotesTab() {
       setLoading(false)
       setRefreshing(false)
     }
+  }
+
+  const handleSubjectChange = (subject: string) => {
+    setSelectedSubject(subject)
+    setLoading(true)
   }
 
   const onRefresh = () => {
@@ -79,6 +95,34 @@ export default function NotesTab() {
     )
   }
 
+  const handleEditTitle = (note: Note) => {
+    setEditingNote(note)
+    setNewTitle(note.title)
+    setEditModalVisible(true)
+  }
+
+  const handleSaveTitle = async () => {
+    if (!editingNote || !newTitle.trim()) return
+
+    const trimmedTitle = newTitle.trim()
+    if (trimmedTitle === editingNote.title) {
+      setEditModalVisible(false)
+      return
+    }
+
+    try {
+      await notesAPI.updateTitle(editingNote.id, trimmedTitle, token)
+      // 로컬 상태 업데이트
+      setNotes(prev => prev.map(n =>
+        n.id === editingNote.id ? { ...n, title: trimmedTitle } : n
+      ))
+      setEditModalVisible(false)
+    } catch (error: any) {
+      console.error('제목 변경 오류:', error)
+      Alert.alert('오류', error.message || '제목 변경 중 오류가 발생했습니다.')
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { text: string; color: string }> = {
       uploading: { text: '업로드 중', color: '#D1D5DB' },
@@ -105,6 +149,8 @@ export default function NotesTab() {
           { marginRight: index % NUM_COLUMNS === 0 ? CARD_MARGIN : 0, backgroundColor: colors.cardBg }
         ]}
         onPress={() => router.push(`/notes/${item.id}`)}
+        onLongPress={() => handleEditTitle(item)}
+        delayLongPress={500}
       >
         {/* 썸네일 */}
         <View style={styles.thumbnailContainer}>
@@ -179,6 +225,29 @@ export default function NotesTab() {
         <Text style={[styles.headerCount, { color: colors.textLight }]}>{notes.length}개의 노트</Text>
       </View>
 
+      {/* 과목 필터 탭 */}
+      <View style={[styles.filterContainer, { backgroundColor: colors.cardBg }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {SUBJECT_FILTERS.map((filter) => (
+            <TouchableOpacity
+              key={filter.key}
+              style={[
+                styles.filterTab,
+                selectedSubject === filter.key && { backgroundColor: colors.primary }
+              ]}
+              onPress={() => handleSubjectChange(filter.key)}
+            >
+              <Text style={[
+                styles.filterTabText,
+                { color: selectedSubject === filter.key ? '#fff' : colors.textLight }
+              ]}>
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* 노트 목록 */}
       {notes.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -198,6 +267,43 @@ export default function NotesTab() {
           onRefresh={onRefresh}
         />
       )}
+
+      {/* 제목 변경 모달 */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBg }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>제목 변경</Text>
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.tabBarBorder }]}
+              value={newTitle}
+              onChangeText={setNewTitle}
+              placeholder="새 제목을 입력하세요"
+              placeholderTextColor={colors.textLight}
+              autoFocus
+              selectTextOnFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSaveTitle}
+              >
+                <Text style={styles.saveButtonText}>저장</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -224,6 +330,25 @@ const styles = StyleSheet.create({
   headerCount: {
     fontSize: 14,
     marginTop: 4,
+  },
+  filterContainer: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  filterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  filterTabText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   list: {
     padding: 16,
@@ -333,6 +458,57 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   loginButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#E5E7EB',
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {},
+  saveButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',

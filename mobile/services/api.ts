@@ -178,13 +178,17 @@ export const processAPI = {
  * 노트 관리 API
  */
 export const notesAPI = {
-  list: async (skip: number = 0, limit: number = 20, token?: string | null): Promise<Note[]> => {
+  list: async (skip: number = 0, limit: number = 20, token?: string | null, subject?: string): Promise<Note[]> => {
     const headers: Record<string, string> = {}
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
+    const params: Record<string, any> = { skip, limit }
+    if (subject && subject !== 'all') {
+      params.subject = subject
+    }
     const response = await apiClient.get('/api/notes/', {
-      params: { skip, limit },
+      params,
       headers,
     })
     return response.data
@@ -201,6 +205,15 @@ export const notesAPI = {
       headers['Authorization'] = `Bearer ${token}`
     }
     await apiClient.delete(`/api/notes/${noteId}`, { headers })
+  },
+
+  updateTitle: async (noteId: number, title: string, token?: string | null): Promise<{ message: string; note_id: number; title: string }> => {
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    const response = await apiClient.patch(`/api/notes/${noteId}`, { title }, { headers })
+    return response.data
   },
 }
 

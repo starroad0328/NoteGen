@@ -17,6 +17,11 @@ class NoteCreate(BaseModel):
     )
 
 
+class NoteUpdate(BaseModel):
+    """노트 수정 요청"""
+    title: str = Field(..., min_length=1, max_length=200, description="노트 제목")
+
+
 class NoteResponse(BaseModel):
     """노트 응답"""
     id: int
