@@ -127,7 +127,17 @@ async def upload_images(
     from app.api.process import process_note_pipeline
     background_tasks.add_task(process_note_pipeline, note.id)
 
-    return note
+    # 명시적으로 응답 반환 (직렬화 문제 방지)
+    return {
+        "id": note.id,
+        "title": note.title,
+        "created_at": note.created_at,
+        "organize_method": note.organize_method,
+        "status": note.status,
+        "organized_content": None,
+        "error_message": None,
+        "image_urls": None
+    }
 
 
 @router.get("/{note_id}", response_model=NoteResponse)

@@ -130,20 +130,26 @@ export const uploadAPI = {
     })
     formData.append('organize_method', organizeMethod)
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'multipart/form-data',
-    }
-
-    // 로그인한 경우 토큰 추가
+    // 업로드는 이미지 전송 때문에 timeout을 120초로 늘림
+    // axios 인스턴스 대신 직접 fetch 사용 (React Native FormData 호환성)
+    const fetchHeaders: Record<string, string> = {}
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`
+      fetchHeaders['Authorization'] = `Bearer ${token}`
     }
 
-    const response = await apiClient.post('/api/upload/', formData, {
-      headers,
+    const response = await fetch(`${API_URL}/api/upload/`, {
+      method: 'POST',
+      headers: fetchHeaders,
+      body: formData,
     })
 
-    return response.data
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Upload failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
   },
 }
 

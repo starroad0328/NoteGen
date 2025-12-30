@@ -205,8 +205,8 @@ class OCRService:
             # 평균 높이 계산
             avg_height = sum(w["h"] for w in current_line) / len(current_line)
 
-            # 같은 줄 판정: cy 차이가 높이의 60% 이내
-            if abs(word["cy"] - last_word["cy"]) < avg_height * 0.6:
+            # 같은 줄 판정: cy 차이가 높이의 80% 이내 (수학 필기는 간격이 좁음)
+            if abs(word["cy"] - last_word["cy"]) < avg_height * 0.8:
                 current_line.append(word)
             else:
                 # 새 줄 시작
@@ -278,9 +278,9 @@ class OCRService:
             x_diff = abs(line["x"] - last_line["x"])
 
             # 같은 블록 판정:
-            # - 줄 간격이 평균 높이의 1.5배 이내
-            # - x 시작점 차이가 50px 이내
-            if line_gap < avg_height * 1.5 and x_diff < 50:
+            # - 줄 간격이 평균 높이의 2배 이내 (수학 필기는 간격이 좁음)
+            # - x 시작점 차이가 100px 이내
+            if line_gap < avg_height * 2.0 and x_diff < 100:
                 current_block.append(line)
             else:
                 # 새 블록 시작

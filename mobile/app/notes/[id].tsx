@@ -18,6 +18,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
 import { notesAPI, Note } from '../../services/api'
 import { NoteRenderer, convertToNoteData, NoteData } from '../../components/note'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
@@ -26,6 +27,7 @@ export default function NoteScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const noteId = parseInt(id as string)
+  const { colors } = useTheme()
 
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
@@ -127,19 +129,19 @@ export default function NoteScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emoji}>📝</Text>
-        <Text style={styles.loadingText}>노트를 불러오는 중...</Text>
+        <Text style={[styles.loadingText, { color: colors.textLight }]}>노트를 불러오는 중...</Text>
       </View>
     )
   }
 
   if (!note) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emoji}>❌</Text>
-        <Text style={styles.errorText}>노트를 찾을 수 없습니다</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+        <Text style={[styles.errorText, { color: colors.textLight }]}>노트를 찾을 수 없습니다</Text>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
           <Text style={styles.buttonText}>뒤로 가기</Text>
         </TouchableOpacity>
       </View>
@@ -147,13 +149,13 @@ export default function NoteScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.tabBarBorder }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← 목록</Text>
+          <Text style={[styles.backText, { color: colors.primary }]}>← 목록</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           {note.title}
         </Text>
         <View style={styles.headerButtons}>
@@ -170,15 +172,15 @@ export default function NoteScreen() {
       </View>
 
       {/* 정리 방식 태그 */}
-      <View style={styles.tagBar}>
-        <View style={styles.tag}>
+      <View style={[styles.tagBar, { backgroundColor: colors.background, borderBottomColor: colors.tabBarBorder }]}>
+        <View style={[styles.tag, { backgroundColor: colors.primary }]}>
           <Text style={styles.tagText}>
             {getMethodLabel(note.organize_method)}
           </Text>
         </View>
         {note.detected_subject && (
-          <View style={[styles.tag, styles.subjectTag]}>
-            <Text style={styles.tagText}>{note.detected_subject}</Text>
+          <View style={[styles.tag, styles.subjectTag, { backgroundColor: colors.accent }]}>
+            <Text style={[styles.tagText, { color: colors.text }]}>{note.detected_subject}</Text>
           </View>
         )}
       </View>
@@ -188,12 +190,13 @@ export default function NoteScreen() {
         <NoteRenderer
           data={noteData}
           scrollRef={contentScrollRef}
+          colors={colors}
         />
       )}
 
       {/* 노트 정보 */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
+      <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.tabBarBorder }]}>
+        <Text style={[styles.footerText, { color: colors.textLight }]}>
           {new Date(note.created_at).toLocaleString('ko-KR')}
         </Text>
       </View>
@@ -211,13 +214,13 @@ export default function NoteScreen() {
       <Animated.View
         style={[
           styles.drawer,
-          { transform: [{ translateX: drawerAnim }] }
+          { transform: [{ translateX: drawerAnim }], backgroundColor: colors.cardBg }
         ]}
       >
-        <View style={styles.drawerHeader}>
-          <Text style={styles.drawerTitle}>📑 목차</Text>
+        <View style={[styles.drawerHeader, { backgroundColor: colors.background, borderBottomColor: colors.tabBarBorder }]}>
+          <Text style={[styles.drawerTitle, { color: colors.text }]}>📑 목차</Text>
           <TouchableOpacity onPress={closeDrawer}>
-            <Text style={styles.closeButton}>✕</Text>
+            <Text style={[styles.closeButton, { color: colors.textLight }]}>✕</Text>
           </TouchableOpacity>
         </View>
 
@@ -227,7 +230,7 @@ export default function NoteScreen() {
               key={index}
               style={[
                 styles.drawerItem,
-                { paddingLeft: 16 + item.level * 12 }
+                { paddingLeft: 16 + item.level * 12, borderBottomColor: colors.tabBarBorder }
               ]}
               onPress={() => {
                 // TODO: 해당 섹션으로 스크롤
@@ -236,6 +239,7 @@ export default function NoteScreen() {
             >
               <Text style={[
                 styles.drawerItemText,
+                { color: colors.text },
                 item.level === 0 && styles.drawerItemTitle
               ]}>
                 {item.title}

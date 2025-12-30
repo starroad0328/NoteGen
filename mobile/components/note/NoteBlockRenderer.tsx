@@ -28,98 +28,100 @@ import {
   // 단어장
   VocabularyBlock,
 } from './types';
+import { ThemeColors } from '../../contexts/ThemeContext';
 
 interface BlockRendererProps {
   block: NoteBlock;
   index: number;
+  colors?: ThemeColors;
 }
 
-export function NoteBlockRenderer({ block, index }: BlockRendererProps) {
+export function NoteBlockRenderer({ block, index, colors }: BlockRendererProps) {
   switch (block.type) {
     case 'title':
-      return <TitleBlockView block={block} />;
+      return <TitleBlockView block={block} colors={colors} />;
     case 'heading':
-      return <HeadingBlockView block={block} />;
+      return <HeadingBlockView block={block} colors={colors} />;
     case 'paragraph':
-      return <ParagraphBlockView block={block} />;
+      return <ParagraphBlockView block={block} colors={colors} />;
     case 'bullet':
-      return <BulletBlockView block={block} />;
+      return <BulletBlockView block={block} colors={colors} />;
     case 'numbered':
-      return <NumberedBlockView block={block} />;
+      return <NumberedBlockView block={block} colors={colors} />;
     case 'keyword':
-      return <KeywordBlockView block={block} />;
+      return <KeywordBlockView block={block} colors={colors} />;
     case 'summary':
-      return <SummaryBlockView block={block} />;
+      return <SummaryBlockView block={block} colors={colors} />;
     case 'important':
       return <ImportantBlockView block={block} />;
     case 'example':
-      return <ExampleBlockView block={block} />;
+      return <ExampleBlockView block={block} colors={colors} />;
     case 'formula':
-      return <FormulaBlockView block={block} />;
+      return <FormulaBlockView block={block} colors={colors} />;
     case 'definition':
-      return <DefinitionBlockView block={block} />;
+      return <DefinitionBlockView block={block} colors={colors} />;
     case 'tip':
       return <TipBlockView block={block} />;
     case 'divider':
-      return <View style={styles.divider} />;
+      return <View style={[styles.divider, colors && { backgroundColor: colors.tabBarBorder }]} />;
     case 'simpleSection':
-      return <SimpleSectionBlockView block={block} />;
+      return <SimpleSectionBlockView block={block} colors={colors} />;
     // 오답노트
     case 'problem':
-      return <ProblemBlockView block={block} />;
+      return <ProblemBlockView block={block} colors={colors} />;
     case 'solution':
-      return <SolutionBlockView block={block} />;
+      return <SolutionBlockView block={block} colors={colors} />;
     case 'wrongPoint':
-      return <WrongPointBlockView block={block} />;
+      return <WrongPointBlockView block={block} colors={colors} />;
     case 'concept':
-      return <ConceptBlockView block={block} />;
+      return <ConceptBlockView block={block} colors={colors} />;
     // 단어장
     case 'vocabulary':
-      return <VocabularyBlockView block={block} />;
+      return <VocabularyBlockView block={block} colors={colors} />;
     default:
       return null;
   }
 }
 
 // 제목 블록
-function TitleBlockView({ block }: { block: TitleBlock }) {
+function TitleBlockView({ block, colors }: { block: TitleBlock; colors?: ThemeColors }) {
   return (
-    <View style={styles.titleContainer}>
-      <Text style={styles.title}>{block.content}</Text>
+    <View style={[styles.titleContainer, colors && { borderBottomColor: colors.tabBarBorder }]}>
+      <Text style={[styles.title, colors && { color: colors.text }]}>{block.content}</Text>
       {block.subtitle && (
-        <Text style={styles.subtitle}>{block.subtitle}</Text>
+        <Text style={[styles.subtitle, colors && { color: colors.textLight }]}>{block.subtitle}</Text>
       )}
     </View>
   );
 }
 
 // 소제목 블록
-function HeadingBlockView({ block }: { block: HeadingBlock }) {
+function HeadingBlockView({ block, colors }: { block: HeadingBlock; colors?: ThemeColors }) {
   const headingStyles = [
     styles.heading1,
     styles.heading2,
     styles.heading3,
   ];
   return (
-    <Text style={[styles.headingBase, headingStyles[block.level - 1]]}>
+    <Text style={[styles.headingBase, headingStyles[block.level - 1], colors && { color: colors.text, borderBottomColor: colors.tabBarBorder }]}>
       {block.content}
     </Text>
   );
 }
 
 // 본문 블록
-function ParagraphBlockView({ block }: { block: ParagraphBlock }) {
-  return <Text style={styles.paragraph}>{block.content}</Text>;
+function ParagraphBlockView({ block, colors }: { block: ParagraphBlock; colors?: ThemeColors }) {
+  return <Text style={[styles.paragraph, colors && { color: colors.text }]}>{block.content}</Text>;
 }
 
 // 글머리표 블록
-function BulletBlockView({ block }: { block: BulletBlock }) {
+function BulletBlockView({ block, colors }: { block: BulletBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.listContainer}>
       {block.items.map((item, i) => (
         <View key={i} style={styles.bulletItem}>
-          <Text style={styles.bulletDot}>•</Text>
-          <Text style={styles.listText}>{item}</Text>
+          <Text style={[styles.bulletDot, colors && { color: colors.textLight }]}>•</Text>
+          <Text style={[styles.listText, colors && { color: colors.text }]}>{item}</Text>
         </View>
       ))}
     </View>
@@ -127,13 +129,13 @@ function BulletBlockView({ block }: { block: BulletBlock }) {
 }
 
 // 번호 목록 블록
-function NumberedBlockView({ block }: { block: NumberedBlock }) {
+function NumberedBlockView({ block, colors }: { block: NumberedBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.listContainer}>
       {block.items.map((item, i) => (
         <View key={i} style={styles.numberedItem}>
-          <Text style={styles.numberText}>{i + 1}.</Text>
-          <Text style={styles.listText}>{item}</Text>
+          <Text style={[styles.numberText, colors && { color: colors.textLight }]}>{i + 1}.</Text>
+          <Text style={[styles.listText, colors && { color: colors.text }]}>{item}</Text>
         </View>
       ))}
     </View>
@@ -141,14 +143,14 @@ function NumberedBlockView({ block }: { block: NumberedBlock }) {
 }
 
 // 키워드 블록 (코넬식 cues 대체)
-function KeywordBlockView({ block }: { block: KeywordBlock }) {
+function KeywordBlockView({ block, colors }: { block: KeywordBlock; colors?: ThemeColors }) {
   const style = block.style || 'chips';
 
   if (style === 'chips') {
     return (
-      <View style={styles.keywordChipsContainer}>
+      <View style={[styles.keywordChipsContainer, colors && { backgroundColor: colors.background }]}>
         {block.keywords.map((keyword, i) => (
-          <View key={i} style={styles.keywordChip}>
+          <View key={i} style={[styles.keywordChip, colors && { backgroundColor: colors.primary }]}>
             <Text style={styles.keywordChipText}>{keyword}</Text>
           </View>
         ))}
@@ -158,12 +160,12 @@ function KeywordBlockView({ block }: { block: KeywordBlock }) {
 
   if (style === 'list') {
     return (
-      <View style={styles.keywordListContainer}>
-        <Text style={styles.keywordLabel}>핵심 키워드</Text>
+      <View style={[styles.keywordListContainer, colors && { backgroundColor: colors.background }]}>
+        <Text style={[styles.keywordLabel, colors && { color: colors.primary }]}>핵심 키워드</Text>
         {block.keywords.map((keyword, i) => (
           <View key={i} style={styles.keywordListItem}>
-            <View style={styles.keywordDot} />
-            <Text style={styles.keywordListText}>{keyword}</Text>
+            <View style={[styles.keywordDot, colors && { backgroundColor: colors.primary }]} />
+            <Text style={[styles.keywordListText, colors && { color: colors.text }]}>{keyword}</Text>
           </View>
         ))}
       </View>
@@ -172,22 +174,22 @@ function KeywordBlockView({ block }: { block: KeywordBlock }) {
 
   // inline
   return (
-    <Text style={styles.keywordInline}>
-      <Text style={styles.keywordLabel}>키워드: </Text>
+    <Text style={[styles.keywordInline, colors && { color: colors.text }]}>
+      <Text style={[styles.keywordLabel, colors && { color: colors.primary }]}>키워드: </Text>
       {block.keywords.join(' · ')}
     </Text>
   );
 }
 
 // 요약 블록
-function SummaryBlockView({ block }: { block: SummaryBlock }) {
+function SummaryBlockView({ block, colors }: { block: SummaryBlock; colors?: ThemeColors }) {
   return (
-    <View style={styles.summaryContainer}>
+    <View style={[styles.summaryContainer, colors && { backgroundColor: colors.background, borderColor: colors.accent }]}>
       <View style={styles.summaryHeader}>
         <Text style={styles.summaryIcon}>📌</Text>
-        <Text style={styles.summaryLabel}>요약</Text>
+        <Text style={[styles.summaryLabel, colors && { color: colors.primaryDark }]}>요약</Text>
       </View>
-      <Text style={styles.summaryText}>{block.content}</Text>
+      <Text style={[styles.summaryText, colors && { color: colors.text }]}>{block.content}</Text>
     </View>
   );
 }
@@ -212,33 +214,33 @@ function ImportantBlockView({ block }: { block: ImportantBlock }) {
 }
 
 // 예시 블록
-function ExampleBlockView({ block }: { block: ExampleBlock }) {
+function ExampleBlockView({ block, colors }: { block: ExampleBlock; colors?: ThemeColors }) {
   return (
-    <View style={styles.exampleContainer}>
-      <Text style={styles.exampleLabel}>{block.label || '예시'}</Text>
-      <Text style={styles.exampleText}>{block.content}</Text>
+    <View style={[styles.exampleContainer, colors && { backgroundColor: colors.background, borderLeftColor: colors.primary }]}>
+      <Text style={[styles.exampleLabel, colors && { color: colors.primaryDark }]}>{block.label || '예시'}</Text>
+      <Text style={[styles.exampleText, colors && { color: colors.text }]}>{block.content}</Text>
     </View>
   );
 }
 
 // 공식 블록
-function FormulaBlockView({ block }: { block: FormulaBlock }) {
+function FormulaBlockView({ block, colors }: { block: FormulaBlock; colors?: ThemeColors }) {
   return (
-    <View style={styles.formulaContainer}>
-      <Text style={styles.formulaContent}>{block.content}</Text>
+    <View style={[styles.formulaContainer, colors && { backgroundColor: colors.background }]}>
+      <Text style={[styles.formulaContent, colors && { color: colors.primaryDark }]}>{block.content}</Text>
       {block.description && (
-        <Text style={styles.formulaDescription}>{block.description}</Text>
+        <Text style={[styles.formulaDescription, colors && { color: colors.textLight }]}>{block.description}</Text>
       )}
     </View>
   );
 }
 
 // 정의 블록
-function DefinitionBlockView({ block }: { block: DefinitionBlock }) {
+function DefinitionBlockView({ block, colors }: { block: DefinitionBlock; colors?: ThemeColors }) {
   return (
-    <View style={styles.definitionContainer}>
-      <Text style={styles.definitionTerm}>{block.term}</Text>
-      <Text style={styles.definitionText}>{block.definition}</Text>
+    <View style={[styles.definitionContainer, colors && { backgroundColor: colors.background, borderLeftColor: colors.primary }]}>
+      <Text style={[styles.definitionTerm, colors && { color: colors.primaryDark }]}>{block.term}</Text>
+      <Text style={[styles.definitionText, colors && { color: colors.text }]}>{block.definition}</Text>
     </View>
   );
 }
@@ -265,12 +267,12 @@ function TipBlockView({ block }: { block: TipBlock }) {
 // 단순 섹션 블록 (오답노트용)
 // ============================================
 
-function SimpleSectionBlockView({ block }: { block: SimpleSectionBlock }) {
+function SimpleSectionBlockView({ block, colors }: { block: SimpleSectionBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.simpleSectionContainer}>
-      <Text style={styles.sectionLabel}>{block.label}</Text>
-      <Text style={styles.simpleSectionContent}>{block.content}</Text>
-      <View style={styles.sectionDivider} />
+      <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>{block.label}</Text>
+      <Text style={[styles.simpleSectionContent, colors && { color: colors.text }]}>{block.content}</Text>
+      <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
     </View>
   );
 }
@@ -280,74 +282,74 @@ function SimpleSectionBlockView({ block }: { block: SimpleSectionBlock }) {
 // ============================================
 
 // 문제 블록
-function ProblemBlockView({ block }: { block: ProblemBlock }) {
+function ProblemBlockView({ block, colors }: { block: ProblemBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.problemContainer}>
-      <Text style={styles.sectionLabel}>
+      <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>
         {block.number ? `문제 ${block.number}` : '문제'}
-        {block.source && <Text style={styles.problemSource}> ({block.source})</Text>}
+        {block.source && <Text style={[styles.problemSource, colors && { color: colors.textLight }]}> ({block.source})</Text>}
       </Text>
-      <Text style={styles.problemContent}>{block.content}</Text>
-      <View style={styles.sectionDivider} />
+      <Text style={[styles.problemContent, colors && { color: colors.text }]}>{block.content}</Text>
+      <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
     </View>
   );
 }
 
 // 풀이/정답 블록
-function SolutionBlockView({ block }: { block: SolutionBlock }) {
+function SolutionBlockView({ block, colors }: { block: SolutionBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.solutionContainer}>
-      <Text style={styles.sectionLabel}>정답</Text>
-      <Text style={styles.solutionAnswer}>{block.answer}</Text>
+      <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>정답</Text>
+      <Text style={[styles.solutionAnswer, colors && { color: colors.text }]}>{block.answer}</Text>
 
       {block.steps && block.steps.length > 0 && (
         <View style={styles.stepsContainer}>
-          <Text style={styles.subSectionLabel}>풀이 과정</Text>
+          <Text style={[styles.subSectionLabel, colors && { color: colors.text }]}>풀이 과정</Text>
           {block.steps.map((step, i) => (
             <View key={i} style={styles.stepItem}>
-              <Text style={styles.stepNumber}>{i + 1}.</Text>
-              <Text style={styles.stepText}>{step}</Text>
+              <Text style={[styles.stepNumber, colors && { color: colors.textLight }]}>{i + 1}.</Text>
+              <Text style={[styles.stepText, colors && { color: colors.text }]}>{step}</Text>
             </View>
           ))}
         </View>
       )}
 
       {block.explanation && (
-        <Text style={styles.solutionExplanation}>{block.explanation}</Text>
+        <Text style={[styles.solutionExplanation, colors && { color: colors.text }]}>{block.explanation}</Text>
       )}
-      <View style={styles.sectionDivider} />
+      <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
     </View>
   );
 }
 
 // 틀린 포인트 블록
-function WrongPointBlockView({ block }: { block: WrongPointBlock }) {
+function WrongPointBlockView({ block, colors }: { block: WrongPointBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.wrongPointContainer}>
       {/* 내가 쓴 답 */}
       {block.myAnswer && (
         <View style={styles.wrongSection}>
-          <Text style={styles.sectionLabel}>내가 쓴 답</Text>
-          <Text style={styles.myAnswerText}>{block.myAnswer}</Text>
-          <View style={styles.sectionDivider} />
+          <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>내가 쓴 답</Text>
+          <Text style={[styles.myAnswerText, colors && { color: colors.text }]}>{block.myAnswer}</Text>
+          <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
         </View>
       )}
 
       {/* 틀린 이유 */}
       {block.reason && (
         <View style={styles.wrongSection}>
-          <Text style={styles.sectionLabel}>틀린 이유</Text>
-          <Text style={styles.reasonText}>{block.reason}</Text>
-          <View style={styles.sectionDivider} />
+          <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>틀린 이유</Text>
+          <Text style={[styles.reasonText, colors && { color: colors.text }]}>{block.reason}</Text>
+          <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
         </View>
       )}
 
       {/* 올바른 접근 */}
       {block.correction && (
         <View style={styles.wrongSection}>
-          <Text style={styles.sectionLabel}>올바른 접근</Text>
-          <Text style={styles.correctionText}>{block.correction}</Text>
-          <View style={styles.sectionDivider} />
+          <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>올바른 접근</Text>
+          <Text style={[styles.correctionText, colors && { color: colors.text }]}>{block.correction}</Text>
+          <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
         </View>
       )}
     </View>
@@ -355,22 +357,22 @@ function WrongPointBlockView({ block }: { block: WrongPointBlock }) {
 }
 
 // 관련 개념 블록
-function ConceptBlockView({ block }: { block: ConceptBlock }) {
+function ConceptBlockView({ block, colors }: { block: ConceptBlock; colors?: ThemeColors }) {
   return (
     <View style={styles.conceptContainer}>
-      <Text style={styles.sectionLabel}>관련 개념</Text>
-      <Text style={styles.conceptTitle}>{block.title}</Text>
-      <Text style={styles.conceptContent}>{block.content}</Text>
+      <Text style={[styles.sectionLabel, colors && { color: colors.text }]}>관련 개념</Text>
+      <Text style={[styles.conceptTitle, colors && { color: colors.text }]}>{block.title}</Text>
+      <Text style={[styles.conceptContent, colors && { color: colors.text }]}>{block.content}</Text>
 
       {block.relatedFormulas && block.relatedFormulas.length > 0 && (
         <View style={styles.relatedFormulas}>
-          <Text style={styles.subSectionLabel}>관련 공식</Text>
+          <Text style={[styles.subSectionLabel, colors && { color: colors.text }]}>관련 공식</Text>
           {block.relatedFormulas.map((formula, i) => (
-            <Text key={i} style={styles.relatedFormula}>{formula}</Text>
+            <Text key={i} style={[styles.relatedFormula, colors && { color: colors.text }]}>{formula}</Text>
           ))}
         </View>
       )}
-      <View style={styles.sectionDivider} />
+      <View style={[styles.sectionDivider, colors && { backgroundColor: colors.tabBarBorder }]} />
     </View>
   );
 }
@@ -380,43 +382,43 @@ function ConceptBlockView({ block }: { block: ConceptBlock }) {
 // ============================================
 
 // 단어 블록
-function VocabularyBlockView({ block }: { block: VocabularyBlock }) {
+function VocabularyBlockView({ block, colors }: { block: VocabularyBlock; colors?: ThemeColors }) {
   return (
-    <View style={styles.vocabContainer}>
+    <View style={[styles.vocabContainer, colors && { backgroundColor: colors.cardBg, borderColor: colors.tabBarBorder }]}>
       <View style={styles.vocabHeader}>
-        <Text style={styles.vocabWord}>{block.word}</Text>
+        <Text style={[styles.vocabWord, colors && { color: colors.text }]}>{block.word}</Text>
         {block.pronunciation && (
-          <Text style={styles.vocabPronunciation}>[{block.pronunciation}]</Text>
+          <Text style={[styles.vocabPronunciation, colors && { color: colors.textLight }]}>[{block.pronunciation}]</Text>
         )}
         {block.partOfSpeech && (
-          <View style={styles.posBadge}>
-            <Text style={styles.posText}>{block.partOfSpeech}</Text>
+          <View style={[styles.posBadge, colors && { backgroundColor: colors.background }]}>
+            <Text style={[styles.posText, colors && { color: colors.primary }]}>{block.partOfSpeech}</Text>
           </View>
         )}
       </View>
 
-      <Text style={styles.vocabMeaning}>{block.meaning}</Text>
+      <Text style={[styles.vocabMeaning, colors && { color: colors.text }]}>{block.meaning}</Text>
 
       {block.exampleSentence && (
-        <View style={styles.vocabExample}>
-          <Text style={styles.exampleSentence}>{block.exampleSentence}</Text>
+        <View style={[styles.vocabExample, colors && { backgroundColor: colors.background }]}>
+          <Text style={[styles.exampleSentence, colors && { color: colors.text }]}>{block.exampleSentence}</Text>
           {block.exampleTranslation && (
-            <Text style={styles.exampleTranslation}>{block.exampleTranslation}</Text>
+            <Text style={[styles.exampleTranslation, colors && { color: colors.textLight }]}>{block.exampleTranslation}</Text>
           )}
         </View>
       )}
 
       {(block.synonyms?.length || block.antonyms?.length) && (
-        <View style={styles.vocabRelated}>
+        <View style={[styles.vocabRelated, colors && { borderTopColor: colors.tabBarBorder }]}>
           {block.synonyms && block.synonyms.length > 0 && (
             <Text style={styles.synonyms}>
-              <Text style={styles.relatedLabel}>유의어: </Text>
+              <Text style={[styles.relatedLabel, colors && { color: colors.textLight }]}>유의어: </Text>
               {block.synonyms.join(', ')}
             </Text>
           )}
           {block.antonyms && block.antonyms.length > 0 && (
             <Text style={styles.antonyms}>
-              <Text style={styles.relatedLabel}>반의어: </Text>
+              <Text style={[styles.relatedLabel, colors && { color: colors.textLight }]}>반의어: </Text>
               {block.antonyms.join(', ')}
             </Text>
           )}

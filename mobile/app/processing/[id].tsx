@@ -8,8 +8,12 @@ const BASE_DELAY = 800  // 0.8초로 줄임
 
 export default function ProcessingScreen() {
   const router = useRouter()
-  const { id } = useLocalSearchParams()
-  const noteId = parseInt(id as string)
+  const params = useLocalSearchParams()
+
+  // id가 배열일 수도 있으므로 처리
+  const rawId = params.id
+  const idString = Array.isArray(rawId) ? rawId[0] : rawId
+  const noteId = idString ? parseInt(idString, 10) : NaN
 
   const [status, setStatus] = useState('uploading')
   const [message, setMessage] = useState('처리 중...')
@@ -21,6 +25,13 @@ export default function ProcessingScreen() {
   useEffect(() => {
     isMountedRef.current = true
     let retryCount = 0
+
+    // NaN 체크 - 잘못된 ID면 에러 표시
+    if (isNaN(noteId)) {
+      setStatus('error')
+      setMessage('잘못된 노트 ID입니다.')
+      return
+    }
 
     const checkStatus = async () => {
       if (!isMountedRef.current) return

@@ -1,0 +1,161 @@
+# 필기 정리 파이프라인
+
+## 전체 흐름
+
+```
+[사용자] 필기 사진 업로드
+         ↓
+[서버] 1. 이미지 저장 (uploads/)
+         ↓
+[서버] 2. OCR 처리 (Google Vision API)
+         ↓
+[서버] 3. AI 정리 (플랜별 모델)
+         ↓
+[서버] 4. 취약 개념 추출 (Pro + 오답노트만)
+         ↓
+[사용자] 정리 결과 확인 (보관함)
+         ↓
+[사용자] MY 탭에서 취약 개념 확인 (Pro)
+```
+
+---
+
+## 1. 업로드 단계 (`/api/upload`)
+
+- 이미지 파일 저장: `./uploads/{uuid}.jpg`
+- Note 레코드 생성 (status: pending)
+- 사용량 체크 (플랜별 월간 제한)
+
+---
+
+## 2. OCR 단계
+
+- Google Cloud Vision API 사용
+- 텍스트 + 블록 좌표 메타데이터 추출
+- `note.ocr_text`, `note.ocr_metadata` 저장
+
+---
+
+## 3. AI 정리 단계 (2단계 파이프라인)
+
+### Step 0: OCR 정제 (gpt-5-nano)
+- OCR 텍스트 정제 및 수학 기호 복원
+
+### Step 1: 과목/타입 감지 (gpt-5-nano)
+- 과목 자동 감지: math, korean, english, etc.
+- 노트 타입 감지: error_note, summary, vocabulary
+- 단원 감지
+
+### Step 2: 본문 정리 (플랜별 모델)
+- Free: gpt-5-mini
+- Basic: gpt-5
+- Pro: gpt-5.2
+
+### 프롬프트 파일 위치
+- `backend/app/prompts/math_error_note.txt`
+- `backend/app/prompts/general_error_note.txt`
+- `backend/app/prompts/english_vocab.txt`
+
+---
+
+## 4. 취약 개념 추출 (Pro 전용)
+
+### 조건
+- 사용자 플랜: Pro
+- 노트 타입: error_note (오답노트)
+
+### 흐름
+```
+[정리 완료된 오답노트]
+         ↓
+[파싱] 틀린 이유, 핵심 공식, 주의점 섹션 추출
+         ↓
+[AI] gpt-5-mini로 취약 개념 JSON 추출
+         ↓
+[DB] user_weak_concepts 테이블에 저장
+```
+
+### 출력 형식
+```json
+[
+  {"concept": "이차방정식", "error_reason": "근의 공식 적용 오류"},
+  {"concept": "부호 처리", "error_reason": "음수 계산 실수"}
+]
+```
+
+### DB 스키마 (UserWeakConcept)
+- user_id: 사용자 ID
+- subject: 과목 (math, korean, etc.)
+- unit: 단원
+- concept: 취약 개념명
+- error_reason: 틀린 이유
+- error_count: 틀린 횟수 (중복 시 증가)
+- last_note_id: 마지막 관련 노트 ID
+
+---
+
+## 5. 노트 삭제 시
+
+```
+[노트 삭제 요청]
+         ↓
+[서버] 이미지 파일 삭제
+         ↓
+[서버] 관련 취약 개념 삭제 (last_note_id 일치)
+         ↓
+[서버] 노트 레코드 삭제
+```
+
+---
+
+## 6. 플랜별 차이
+
+| 항목 | Free | Basic | Pro |
+|------|------|-------|-----|
+| 월간 사용량 | 20회 | 150회 | 무제한 |
+| AI 모델 | gpt-5-mini | gpt-5 | gpt-5.2 |
+| 취약 개념 추출 | X | X | O |
+| 취약 개념 대시보드 | X | X | O |
+
+---
+
+## 7. API 엔드포인트
+
+### 필기 관련
+- `POST /api/upload` - 이미지 업로드
+- `POST /api/process/{note_id}` - 정리 시작
+- `POST /api/process/{note_id}/reprocess` - 재정리
+- `GET /api/notes` - 노트 목록
+- `GET /api/notes/{note_id}` - 노트 상세
+- `DELETE /api/notes/{note_id}` - 노트 삭제
+
+### 취약 개념 관련 (Pro 전용)
+- `GET /api/weak-concepts` - 취약 개념 목록
+- `GET /api/weak-concepts/overview` - 대시보드 요약
+- `GET /api/weak-concepts/subject/{subject}` - 과목별 필터
+- `DELETE /api/weak-concepts/{id}` - 취약 개념 삭제
+
+---
+
+## 8. 파일 구조
+
+```
+backend/
+├── app/
+│   ├── api/
+│   │   ├── upload.py          # 업로드 API
+│   │   ├── process.py         # 정리 파이프라인
+│   │   ├── notes.py           # 노트 CRUD
+│   │   └── weak_concepts.py   # 취약 개념 API
+│   ├── models/
+│   │   ├── note.py            # Note 모델
+│   │   ├── user.py            # User, AIModel, UserPlan
+│   │   └── weak_concept.py    # UserWeakConcept 모델
+│   ├── services/
+│   │   └── ai_service.py      # AI 정리 서비스
+│   └── prompts/               # 정리 프롬프트
+```
+
+---
+
+최종 업데이트: 2025-12-30

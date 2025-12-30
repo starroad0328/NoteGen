@@ -7,25 +7,27 @@ import React from 'react';
 import { ScrollView, View, StyleSheet } from 'react-native';
 import { NoteData, NoteBlock } from './types';
 import { NoteBlockRenderer } from './NoteBlockRenderer';
+import { ThemeColors } from '../../contexts/ThemeContext';
 
 interface NoteRendererProps {
   data: NoteData;
   scrollRef?: React.RefObject<ScrollView>;
   onScroll?: (event: any) => void;
+  colors?: ThemeColors;
 }
 
-export function NoteRenderer({ data, scrollRef, onScroll }: NoteRendererProps) {
+export function NoteRenderer({ data, scrollRef, onScroll, colors }: NoteRendererProps) {
   return (
     <ScrollView
       ref={scrollRef}
-      style={styles.container}
+      style={[styles.container, colors && { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       onScroll={onScroll}
       scrollEventThrottle={16}
     >
       {data.blocks.map((block, index) => (
-        <NoteBlockRenderer key={block.id || index} block={block} index={index} />
+        <NoteBlockRenderer key={block.id || index} block={block} index={index} colors={colors} />
       ))}
 
       {/* 하단 여백 */}
