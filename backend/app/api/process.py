@@ -10,7 +10,8 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.note import Note, ProcessStatus, Subject, NoteType, OrganizeMethod
-from app.models.user import User
+from app.models.user import User, UserPlan
+from app.models.weak_concept import UserWeakConcept
 from app.schemas.note import ProcessResponse
 from app.services.ocr_service import ocr_service
 from app.services.ai_service import ai_service
@@ -104,17 +105,19 @@ async def process_note_pipeline(note_id: int):
         note.status = ProcessStatus.AI_ORGANIZING
         db.commit()
 
-        # 사용자 학년 정보 조회
+        # 사용자 학년 정보 및 플랜별 AI 모델 조회
         user = None
         school_level = None
         grade = None
+        ai_model = None  # 플랜별 AI 모델
         if note.user_id:
             user = db.query(User).filter(User.id == note.user_id).first()
             if user:
                 school_level = user.school_level
                 grade = user.grade
+                ai_model = user.get_default_model()  # 플랜에 맞는 AI 모델
                 with open('./debug.log', 'a') as f:
-                    f.write(f"[{note_id}] User grade info: {user.grade_display}\n")
+                    f.write(f"[{note_id}] User: {user.grade_display}, plan={user.plan.value}, model={ai_model.value}\n")
 
         # AI 단계 진행 콜백
         async def on_ai_step(step: int, message: str):
@@ -124,7 +127,7 @@ async def process_note_pipeline(note_id: int):
 
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] [PROCESS] organize_note 호출 직전\n")
-            f.write(f"[{note_id}] [PROCESS] ocr_metadata type: {type(ocr_metadata)}\n")
+            f.write(f"[{note_id}] [PROCESS] ocr_metadata type: {type(ocr_metadata)}, ai_model: {ai_model}\n")
 
         result = await ai_service.organize_note(
             ocr_text=ocr_text,
@@ -132,7 +135,8 @@ async def process_note_pipeline(note_id: int):
             ocr_metadata=ocr_metadata,
             on_step=on_ai_step,
             school_level=school_level,
-            grade=grade
+            grade=grade,
+            ai_model=ai_model  # 플랜별 AI 모델 전달
         )
 
         with open('./debug.log', 'a') as f:
@@ -165,6 +169,52 @@ async def process_note_pipeline(note_id: int):
         note.organized_content = organized_content
         note.status = ProcessStatus.COMPLETED
         db.commit()
+
+        # 프로 사용자 + 오답노트인 경우 취약 개념 추출 및 저장
+        if user and user.plan == UserPlan.PRO and detected_note_type_str == "error_note":
+            try:
+                with open('./debug.log', 'a') as f:
+                    f.write(f"[{note_id}] Pro user - extracting weak concepts...\n")
+
+                weak_concepts = await ai_service.extract_weak_concepts(
+                    organized_content=organized_content,
+                    subject=detected_subject_str,
+                    unit=detected_unit
+                )
+
+                for concept_data in weak_concepts:
+                    # 기존 취약 개념 확인
+                    existing = db.query(UserWeakConcept).filter(
+                        UserWeakConcept.user_id == user.id,
+                        UserWeakConcept.subject == detected_subject_str,
+                        UserWeakConcept.concept == concept_data["concept"]
+                    ).first()
+
+                    if existing:
+                        # 기존 개념이면 횟수 증가
+                        existing.increment_error(
+                            note_id=note_id,
+                            error_reason=concept_data.get("error_reason")
+                        )
+                    else:
+                        # 새 취약 개념 생성
+                        new_concept = UserWeakConcept(
+                            user_id=user.id,
+                            subject=detected_subject_str,
+                            unit=detected_unit,
+                            concept=concept_data["concept"],
+                            error_reason=concept_data.get("error_reason"),
+                            last_note_id=note_id
+                        )
+                        db.add(new_concept)
+
+                db.commit()
+                with open('./debug.log', 'a') as f:
+                    f.write(f"[{note_id}] Saved {len(weak_concepts)} weak concepts\n")
+
+            except Exception as e:
+                with open('./debug.log', 'a') as f:
+                    f.write(f"[{note_id}] Weak concept extraction error: {str(e)}\n")
 
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] AI processing completed\n")
@@ -236,28 +286,37 @@ async def reprocess_note(
     db.commit()
 
     try:
-        # 사용자 학년 정보 조회
+        # 사용자 학년 정보 및 플랜별 AI 모델 조회
         user = None
         school_level = None
         grade = None
+        ai_model = None
         if note.user_id:
             user = db.query(User).filter(User.id == note.user_id).first()
             if user:
                 school_level = user.school_level
                 grade = user.grade
+                ai_model = user.get_default_model()
 
         # OCR 메타데이터 파싱
         ocr_metadata = None
         if note.ocr_metadata:
             ocr_metadata = json.loads(note.ocr_metadata)
 
+        with open('./debug.log', 'a') as f:
+            f.write(f"[REPROCESS {note_id}] BEFORE organize_note call\n")
+
         result = await ai_service.organize_note(
             ocr_text=note.ocr_text,
             method=note.organize_method,
             ocr_metadata=ocr_metadata,
             school_level=school_level,
-            grade=grade
+            grade=grade,
+            ai_model=ai_model  # 플랜별 AI 모델 전달
         )
+
+        with open('./debug.log', 'a') as f:
+            f.write(f"[REPROCESS {note_id}] AFTER organize_note, result keys: {list(result.keys())}\n")
 
         # 결과 저장
         organized_content = result.get("content", "")
@@ -281,6 +340,48 @@ async def reprocess_note(
         note.organized_content = organized_content
         note.status = ProcessStatus.COMPLETED
         db.commit()
+
+        # 프로 사용자 + 오답노트인 경우 취약 개념 추출 및 저장
+        import os
+        debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'debug.log')
+        with open(debug_path, 'a') as f:
+            f.write(f"[reprocess {note_id}] user={user is not None}, plan={user.plan.value if user else 'N/A'}, note_type={detected_note_type_str}\n")
+        if user and user.plan == UserPlan.PRO and detected_note_type_str == "error_note":
+            try:
+                with open(debug_path, 'a') as f:
+                    f.write(f"[reprocess {note_id}] Pro user - extracting weak concepts...\n")
+                weak_concepts = await ai_service.extract_weak_concepts(
+                    organized_content=organized_content,
+                    subject=detected_subject_str,
+                    unit=detected_unit
+                )
+
+                for concept_data in weak_concepts:
+                    existing = db.query(UserWeakConcept).filter(
+                        UserWeakConcept.user_id == user.id,
+                        UserWeakConcept.subject == detected_subject_str,
+                        UserWeakConcept.concept == concept_data["concept"]
+                    ).first()
+
+                    if existing:
+                        existing.increment_error(
+                            note_id=note_id,
+                            error_reason=concept_data.get("error_reason")
+                        )
+                    else:
+                        new_concept = UserWeakConcept(
+                            user_id=user.id,
+                            subject=detected_subject_str,
+                            unit=detected_unit,
+                            concept=concept_data["concept"],
+                            error_reason=concept_data.get("error_reason"),
+                            last_note_id=note_id
+                        )
+                        db.add(new_concept)
+
+                db.commit()
+            except Exception as e:
+                print(f"[reprocess] Weak concept extraction error: {str(e)}")
 
         return ProcessResponse(
             note_id=note.id,

@@ -10,6 +10,7 @@ from typing import List, Optional
 from app.core.database import get_db
 from app.models.note import Note
 from app.models.user import User
+from app.models.weak_concept import UserWeakConcept
 from app.schemas.note import NoteResponse, NoteListResponse, NoteUpdate
 from app.api.auth import get_current_user
 
@@ -166,6 +167,9 @@ async def delete_note(
                     os.remove(path)
                 except Exception:
                     pass
+
+    # 관련 취약 개념 삭제
+    db.query(UserWeakConcept).filter(UserWeakConcept.last_note_id == note_id).delete()
 
     db.delete(note)
     db.commit()

@@ -339,4 +339,58 @@ export const paymentAPI = {
   },
 }
 
+/**
+ * 취약 개념 API (Pro 전용)
+ */
+export interface WeakConcept {
+  id: number
+  subject: string
+  unit?: string
+  concept: string
+  error_reason?: string
+  error_count: number
+  first_error_at: string
+  last_error_at: string
+}
+
+export interface SubjectSummary {
+  subject: string
+  subject_name: string
+  total_concepts: number
+  total_errors: number
+  top_concept?: string
+}
+
+export interface WeakConceptsOverview {
+  total_weak_concepts: number
+  total_errors: number
+  subjects: SubjectSummary[]
+  recent_concepts: WeakConcept[]
+}
+
+export const weakConceptsAPI = {
+  getOverview: async (token: string): Promise<WeakConceptsOverview> => {
+    const response = await apiClient.get('/api/weak-concepts/overview', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  getList: async (token: string, subject?: string): Promise<WeakConcept[]> => {
+    const params: Record<string, any> = {}
+    if (subject) params.subject = subject
+    const response = await apiClient.get('/api/weak-concepts/', {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  delete: async (token: string, conceptId: number): Promise<void> => {
+    await apiClient.delete(`/api/weak-concepts/${conceptId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  },
+}
+
 export default apiClient

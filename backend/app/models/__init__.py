@@ -11,3 +11,4 @@ from app.models.subscription import (
     Subscription, Payment, PurchaseVerification,
     SubscriptionStatus, PaymentProvider
 )
+from app.models.weak_concept import UserWeakConcept

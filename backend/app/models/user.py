@@ -78,11 +78,20 @@ class User(Base):
     def get_allowed_models(self):
         """사용 가능한 AI 모델 목록 반환"""
         if self.plan == UserPlan.FREE:
-            return [AIModel.GPT_5_MINI]  # 무료도 GPT-5 mini 사용
-        elif self.plan == UserPlan.BASIC:
             return [AIModel.GPT_5_MINI]
+        elif self.plan == UserPlan.BASIC:
+            return [AIModel.GPT_5_MINI, AIModel.GPT_5]
         else:  # PRO
-            return [AIModel.GPT_5, AIModel.GPT_5_2]  # Pro는 선택 가능
+            return [AIModel.GPT_5_MINI, AIModel.GPT_5, AIModel.GPT_5_2]
+
+    def get_default_model(self) -> 'AIModel':
+        """플랜별 기본 AI 모델 반환"""
+        if self.plan == UserPlan.FREE:
+            return AIModel.GPT_5_MINI  # 무료: gpt-5-mini
+        elif self.plan == UserPlan.BASIC:
+            return AIModel.GPT_5  # 베이직: gpt-5
+        else:  # PRO
+            return AIModel.GPT_5_2  # 프로: gpt-5.2
 
     def can_use_model(self, model: AIModel) -> bool:
         """특정 모델 사용 가능 여부 확인"""
@@ -91,11 +100,11 @@ class User(Base):
     def get_monthly_limit(self) -> int:
         """플랜별 월간 사용 제한 반환"""
         limits = {
-            UserPlan.FREE: 10,
-            UserPlan.BASIC: 100,
-            UserPlan.PRO: -1,  # 무제한
+            UserPlan.FREE: 20,    # 무료: 월 20회
+            UserPlan.BASIC: 150,  # 베이직: 월 150회
+            UserPlan.PRO: -1,     # 프로: 무제한
         }
-        return limits.get(self.plan, 10)
+        return limits.get(self.plan, 20)
 
     def check_and_reset_usage(self) -> None:
         """월이 바뀌었으면 사용량 리셋"""

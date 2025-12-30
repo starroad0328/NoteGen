@@ -42,7 +42,7 @@ class AIService:
         ocr_text: str,
         method: OrganizeMethod,
         ocr_metadata: Optional[Dict] = None,
-        ai_model: AIModel = AIModel.GPT_5_MINI,
+        ai_model: Optional[AIModel] = None,
         on_step: Optional[callable] = None,
         school_level: Optional[SchoolLevel] = None,
         grade: Optional[int] = None
@@ -72,6 +72,10 @@ class AIService:
         """
         if not ocr_text or not ocr_text.strip():
             raise ValueError("정리할 텍스트가 비어있습니다.")
+
+        # ai_model이 None이면 기본값 사용
+        if ai_model is None:
+            ai_model = AIModel.GPT_5_MINI
 
         # 압축된 블록 데이터 추출
         blocks_data = self._get_blocks_for_llm(ocr_metadata) if ocr_metadata else None
@@ -561,6 +565,128 @@ class AIService:
         except json.JSONDecodeError as e:
             print(f"[AI] 코넬식 JSON 파싱 실패: {e}, 원본 반환", flush=True)
             return result
+
+    def _parse_error_note_sections(self, content: str) -> str:
+        """오답노트에서 취약 개념 분석에 필요한 섹션만 추출"""
+        import re
+
+        sections = []
+
+        # 틀린 이유/틀린 부분 추출
+        reason_patterns = [
+            r'\*\*틀린 이유\*\*[:\s]*([^\*]+?)(?=\*\*|$)',
+            r'\*\*틀린 부분\*\*[:\s]*([^\*]+?)(?=\*\*|$)',
+        ]
+        for pattern in reason_patterns:
+            matches = re.findall(pattern, content, re.DOTALL)
+            for m in matches:
+                sections.append(f"틀린 이유: {m.strip()[:300]}")
+
+        # 핵심 공식/핵심 개념 추출
+        formula_patterns = [
+            r'\*\*핵심 공식\*\*[:\s]*([^\*]+?)(?=\*\*|$)',
+            r'\*\*핵심 개념\*\*[:\s]*([^\*]+?)(?=\*\*|$)',
+        ]
+        for pattern in formula_patterns:
+            matches = re.findall(pattern, content, re.DOTALL)
+            for m in matches:
+                sections.append(f"핵심 개념: {m.strip()[:200]}")
+
+        # 주의점 추출
+        caution_pattern = r'\*\*주의점\*\*[:\s]*([^\*]+?)(?=\*\*|$)'
+        matches = re.findall(caution_pattern, content, re.DOTALL)
+        for m in matches:
+            sections.append(f"주의점: {m.strip()[:200]}")
+
+        return "\n".join(sections) if sections else content[:500]
+
+    async def extract_weak_concepts(
+        self,
+        organized_content: str,
+        subject: str,
+        unit: str = ""
+    ) -> list:
+        """
+        오답노트에서 취약 개념 추출
+
+        Args:
+            organized_content: 정리된 오답노트 내용
+            subject: 과목
+            unit: 단원
+
+        Returns:
+            list: [{"concept": "개념명", "error_reason": "틀린 이유"}, ...]
+        """
+        # 필요한 섹션만 추출
+        parsed_content = self._parse_error_note_sections(organized_content)
+        print(f"[AI] 취약 개념 분석용 파싱 완료: {len(parsed_content)}자", flush=True)
+
+        prompt = f"""다음 오답노트 분석 내용을 보고 학생이 취약한 개념을 추출하세요.
+
+[과목]: {subject}
+[단원]: {unit or "미지정"}
+
+[분석 내용]:
+{parsed_content}
+
+[출력]: JSON 배열만 출력. 최대 5개.
+예시: [{{"concept": "이차방정식", "error_reason": "근의 공식 적용 오류"}}]
+
+JSON:"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-5-mini-2025-08-07",  # 취약 개념 추출용
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "오답노트에서 취약 개념을 추출하는 분석가입니다. JSON 배열만 출력합니다."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_completion_tokens=1000
+            )
+
+            print(f"[AI] 취약 개념 response: finish_reason={response.choices[0].finish_reason}", flush=True)
+            result = response.choices[0].message.content
+            print(f"[AI] 취약 개념 원본 응답: {result[:200] if result else 'None'}", flush=True)
+            if response.choices[0].message.refusal:
+                print(f"[AI] 취약 개념 거부됨: {response.choices[0].message.refusal}", flush=True)
+                return []
+            if not result:
+                print("[AI] 취약 개념 응답이 비어있음", flush=True)
+                return []
+            result = result.strip()
+
+            # JSON 파싱
+            if "```json" in result:
+                result = result.split("```json")[1].split("```")[0].strip()
+            elif "```" in result:
+                result = result.split("```")[1].split("```")[0].strip()
+
+            concepts = json.loads(result)
+
+            # 유효성 검사
+            if not isinstance(concepts, list):
+                return []
+
+            valid_concepts = []
+            for c in concepts[:5]:  # 최대 5개
+                if isinstance(c, dict) and "concept" in c:
+                    valid_concepts.append({
+                        "concept": str(c.get("concept", ""))[:200],
+                        "error_reason": str(c.get("error_reason", ""))[:500]
+                    })
+
+            print(f"[AI] 취약 개념 추출 완료: {len(valid_concepts)}개", flush=True)
+            return valid_concepts
+
+        except Exception as e:
+            print(f"[AI] 취약 개념 추출 실패: {e}", flush=True)
+            return []
 
 
 # 싱글톤 인스턴스

@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import init_db, get_db_session
 from app.core.seed_curriculum import seed_curriculum
-from app.api import upload, process, notes, auth, curriculum, payment
+from app.api import upload, process, notes, auth, curriculum, payment, weak_concepts
 
 # 데이터베이스 초기화
 init_db()
@@ -90,6 +90,12 @@ app.include_router(
 app.include_router(
     payment.router,
     tags=["Payment"]
+)
+
+app.include_router(
+    weak_concepts.router,
+    prefix="/api/weak-concepts",
+    tags=["Weak Concepts"]
 )
 
 # 업로드된 이미지 정적 파일 서빙
