@@ -91,3 +91,6 @@ build/
 .cache/
 *.bak
 *.tmp
+
+# Photos
+사진/
