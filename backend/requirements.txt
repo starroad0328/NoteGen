@@ -5,7 +5,7 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 openai
-pydantic
+pydantic[email]
 pydantic-settings
 httpx
 passlib[bcrypt]
