@@ -1,0 +1,115 @@
+================================================================
+NotioClass 개발 일지 - 2026년 1월 1일
+================================================================
+
+작업 내용: Railway 클라우드 서버 배포
+
+
+----------------------------------------------------------------
+1. Railway 클라우드 배포 설정
+----------------------------------------------------------------
+
+목적:
+  - 로컬 서버 없이 핸드폰에서 바로 테스트 가능하게 함
+  - 언제 어디서든 앱 테스트 가능
+
+작업 내용:
+  - Railway 계정 생성 및 프로젝트 설정
+  - GitHub 연동 (starroad0328/NoteGen)
+  - Root Directory: /backend 설정
+  - Builder: Railpack (Python 자동 감지)
+
+수정 파일:
+  - backend/Dockerfile (PORT 환경변수 지원)
+  - backend/requirements.txt (psycopg2-binary, pydantic[email] 추가)
+  - backend/Procfile 추가
+
+
+----------------------------------------------------------------
+2. PostgreSQL 데이터베이스 설정
+----------------------------------------------------------------
+
+작업 내용:
+  - Railway PostgreSQL 서비스 추가
+  - NoteGen 서비스에 DATABASE_URL 연결
+  - Public Networking 활성화
+
+로컬 SQLite → Railway PostgreSQL 마이그레이션:
+  - users 테이블 데이터 이전 (2개 계정)
+
+
+----------------------------------------------------------------
+3. 환경변수 설정
+----------------------------------------------------------------
+
+Railway Variables에 추가:
+  - APP_ENV=production
+  - DEBUG=false
+  - SECRET_KEY
+  - OPENAI_API_KEY
+  - AI_MODEL=gpt-5-nano
+  - CLOVA_OCR_SECRET_KEY
+  - CLOVA_OCR_INVOKE_URL
+  - UPLOAD_DIR=./uploads
+  - MAX_UPLOAD_SIZE=10485760
+  - ALLOWED_EXTENSIONS=jpg,jpeg,png
+  - CORS_ORIGINS=*
+  - LOG_LEVEL=INFO
+
+
+----------------------------------------------------------------
+4. 모바일 앱 API URL 변경
+----------------------------------------------------------------
+
+변경 전:
+  - DEV_API_URL = 'http://192.168.55.96:8000' (로컬)
+
+변경 후:
+  - PROD_API_URL = 'https://notegen-production.up.railway.app' (Railway)
+  - API_URL = PROD_API_URL
+
+수정 파일:
+  - mobile/services/api.ts
+
+
+----------------------------------------------------------------
+5. 발생한 이슈 및 해결
+----------------------------------------------------------------
+
+이슈 1: Dockerfile not found
+  - 원인: railway.json이 Dockerfile 강제 지정
+  - 해결: railway.json 삭제, Railpack 사용
+
+이슈 2: $PORT 환경변수 인식 안 됨
+  - 원인: Custom Start Command에서 $PORT가 리터럴로 처리
+  - 해결: Procfile 추가, Custom Start Command 삭제
+
+이슈 3: email-validator 미설치
+  - 원인: pydantic EmailStr 타입 사용
+  - 해결: pydantic[email]로 변경
+
+이슈 4: PostgreSQL 연결 실패
+  - 원인: internal URL 사용
+  - 해결: Public Networking 활성화
+
+
+----------------------------------------------------------------
+배포 정보
+----------------------------------------------------------------
+
+서버 URL: https://notegen-production.up.railway.app
+PostgreSQL: Railway 내장 (Public URL 활성화)
+플랜: Trial ($5 크레딧 / 30일)
+
+
+----------------------------------------------------------------
+커밋 내역
+----------------------------------------------------------------
+
+34512e5 chore: Railway 클라우드 배포 설정 추가
+aef9986 chore: railway.json 삭제 (Railpack 사용)
+3a8ed89 fix: Procfile 추가 (Railway PORT 환경변수)
+a284d25 fix: email-validator 의존성 추가
+
+
+================================================================
