@@ -297,8 +297,7 @@ class AIService:
 {content}
 """
 
-        with open('C:/NoteGen/backend/debug.log', 'a', encoding='utf-8') as f:
-            f.write(f"[AI] _step1 API 호출 직전\n")
+        print("[AI] _step1 API 호출 직전", flush=True)
 
         response = self.client.chat.completions.create(
             model=ai_model.value,
@@ -315,8 +314,7 @@ class AIService:
             max_completion_tokens=3000
         )
 
-        with open('C:/NoteGen/backend/debug.log', 'a', encoding='utf-8') as f:
-            f.write(f"[AI] _step1 API 호출 완료, finish_reason: {response.choices[0].finish_reason}\n")
+        print(f"[AI] _step1 API 호출 완료, finish_reason: {response.choices[0].finish_reason}", flush=True)
 
         result = response.choices[0].message.content
         if not result or not result.strip():
