@@ -19,6 +19,15 @@ from app.services.ai_service import ai_service
 
 router = APIRouter()
 
+
+def debug_log(note_id: int, message: str):
+    """안전한 디버그 로깅 (Railway 호환)"""
+    try:
+        print(f"[{note_id}] {message}", flush=True)
+    except Exception:
+        pass
+
+
 # 과목명 한글 변환
 SUBJECT_NAMES = {
     "math": "수학",
@@ -67,21 +76,13 @@ async def process_note_pipeline(note_id: int):
 
         # OCR 실행 (오답노트면 Google Vision 사용)
         use_google = note.organize_method == OrganizeMethod.ERROR_NOTE
-        with open('./debug.log', 'a') as f:
-            f.write(f"\n[{note_id}] Starting OCR... (use_google={use_google})\n")
+        debug_log(note_id, f"Starting OCR... (use_google={use_google})")
 
         ocr_result = await ocr_service.extract_text_from_images(image_paths, use_google_for_math=use_google)
-
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] OCR result type: {type(ocr_result)}\n")
-            f.write(f"[{note_id}] OCR result: {isinstance(ocr_result, tuple)}\n")
+        debug_log(note_id, f"OCR result type: {type(ocr_result)}, is_tuple: {isinstance(ocr_result, tuple)}")
 
         ocr_text, ocr_metadata = ocr_result
-
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] Text length: {len(ocr_text) if ocr_text else 0}\n")
-            f.write(f"[{note_id}] Metadata not None: {ocr_metadata is not None}\n")
-            f.write(f"[{note_id}] Metadata type: {type(ocr_metadata)}\n")
+        debug_log(note_id, f"Text length: {len(ocr_text) if ocr_text else 0}, Metadata: {ocr_metadata is not None}")
 
         if not ocr_text or not ocr_text.strip():
             raise Exception("이미지에서 텍스트를 추출할 수 없습니다.")
@@ -89,19 +90,13 @@ async def process_note_pipeline(note_id: int):
         note.ocr_text = ocr_text
         metadata_json = json.dumps(ocr_metadata) if ocr_metadata else None
         note.ocr_metadata = metadata_json
-
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] Metadata JSON length: {len(metadata_json) if metadata_json else 0}\n")
-            f.write(f"[{note_id}] note.ocr_metadata set: {note.ocr_metadata is not None}\n")
+        debug_log(note_id, f"Metadata JSON length: {len(metadata_json) if metadata_json else 0}")
 
         db.commit()
-
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] Committed to DB\n")
+        debug_log(note_id, "Committed OCR to DB")
 
         # 2. AI 정리
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] Starting AI processing...\n")
+        debug_log(note_id, "Starting AI processing...")
 
         note.status = ProcessStatus.AI_ORGANIZING
         db.commit()
@@ -117,18 +112,15 @@ async def process_note_pipeline(note_id: int):
                 school_level = user.school_level
                 grade = user.grade
                 ai_model = user.get_default_model()  # 플랜에 맞는 AI 모델
-                with open('./debug.log', 'a') as f:
-                    f.write(f"[{note_id}] User: {user.grade_display}, plan={user.plan.value}, model={ai_model.value}\n")
+                debug_log(note_id, f"User: {user.grade_display}, plan={user.plan.value}, model={ai_model.value}")
 
         # AI 단계 진행 콜백
         async def on_ai_step(step: int, message: str):
             note.progress_message = f"[{step+1}/3] {message}"
             db.commit()
-            print(f"[{note_id}] AI Step {step}: {message}", flush=True)
+            debug_log(note_id, f"AI Step {step}: {message}")
 
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] [PROCESS] organize_note 호출 직전\n")
-            f.write(f"[{note_id}] [PROCESS] ocr_metadata type: {type(ocr_metadata)}, ai_model: {ai_model}\n")
+        debug_log(note_id, f"organize_note 호출 직전, ocr_metadata type: {type(ocr_metadata)}, ai_model: {ai_model}")
 
         result = await ai_service.organize_note(
             ocr_text=ocr_text,
@@ -140,8 +132,7 @@ async def process_note_pipeline(note_id: int):
             ai_model=ai_model  # 플랜별 AI 모델 전달
         )
 
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] [PROCESS] organize_note 호출 완료\n")
+        debug_log(note_id, "organize_note 호출 완료")
 
         # 결과에서 콘텐츠와 감지 정보 추출
         organized_content = result.get("content", "")
@@ -149,9 +140,8 @@ async def process_note_pipeline(note_id: int):
         detected_note_type_str = result.get("detected_note_type", "general")
         detected_unit = result.get("detected_unit", "")
 
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] AI result length: {len(organized_content) if organized_content else 0}\n")
-            f.write(f"[{note_id}] Detected: subject={detected_subject_str}, note_type={detected_note_type_str}, unit={detected_unit}\n")
+        debug_log(note_id, f"AI result length: {len(organized_content) if organized_content else 0}")
+        debug_log(note_id, f"Detected: subject={detected_subject_str}, note_type={detected_note_type_str}, unit={detected_unit}")
 
         # 문자열을 Enum으로 변환
         try:
@@ -174,8 +164,7 @@ async def process_note_pipeline(note_id: int):
         # 프로 사용자 + 오답노트인 경우 취약 개념 추출 및 저장
         if user and user.plan == UserPlan.PRO and detected_note_type_str == "error_note":
             try:
-                with open('./debug.log', 'a') as f:
-                    f.write(f"[{note_id}] Pro user - extracting weak concepts...\n")
+                debug_log(note_id, "Pro user - extracting weak concepts...")
 
                 weak_concepts = await ai_service.extract_weak_concepts(
                     organized_content=organized_content,
@@ -210,17 +199,14 @@ async def process_note_pipeline(note_id: int):
                         db.add(new_concept)
 
                 db.commit()
-                with open('./debug.log', 'a') as f:
-                    f.write(f"[{note_id}] Saved {len(weak_concepts)} weak concepts\n")
+                debug_log(note_id, f"Saved {len(weak_concepts)} weak concepts")
 
             except Exception as e:
-                with open('./debug.log', 'a') as f:
-                    f.write(f"[{note_id}] Weak concept extraction error: {str(e)}\n")
+                debug_log(note_id, f"Weak concept extraction error: {str(e)}")
 
         # Concept Card 추출 및 저장 (문제 생성용)
         try:
-            with open('./debug.log', 'a') as f:
-                f.write(f"[{note_id}] Extracting concept cards...\n")
+            debug_log(note_id, "Extracting concept cards...")
 
             concept_cards = await ai_service.extract_concept_cards(
                 organized_content=organized_content,
@@ -251,22 +237,18 @@ async def process_note_pipeline(note_id: int):
                 db.add(new_card)
 
             db.commit()
-            with open('./debug.log', 'a') as f:
-                f.write(f"[{note_id}] Saved {len(concept_cards)} concept cards\n")
+            debug_log(note_id, f"Saved {len(concept_cards)} concept cards")
 
         except Exception as e:
-            with open('./debug.log', 'a') as f:
-                f.write(f"[{note_id}] Concept card extraction error: {str(e)}\n")
+            debug_log(note_id, f"Concept card extraction error: {str(e)}")
 
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] AI processing completed\n")
+        debug_log(note_id, "AI processing completed")
 
     except Exception as e:
         note.status = ProcessStatus.FAILED
         note.error_message = str(e)
         db.commit()
-        with open('./debug.log', 'a') as f:
-            f.write(f"[{note_id}] ERROR: {str(e)}\n")
+        debug_log(note_id, f"ERROR: {str(e)}")
     finally:
         db.close()
 
@@ -345,8 +327,7 @@ async def reprocess_note(
         if note.ocr_metadata:
             ocr_metadata = json.loads(note.ocr_metadata)
 
-        with open('./debug.log', 'a') as f:
-            f.write(f"[REPROCESS {note_id}] BEFORE organize_note call\n")
+        debug_log(note_id, "REPROCESS - BEFORE organize_note call")
 
         result = await ai_service.organize_note(
             ocr_text=note.ocr_text,
@@ -357,8 +338,7 @@ async def reprocess_note(
             ai_model=ai_model  # 플랜별 AI 모델 전달
         )
 
-        with open('./debug.log', 'a') as f:
-            f.write(f"[REPROCESS {note_id}] AFTER organize_note, result keys: {list(result.keys())}\n")
+        debug_log(note_id, f"REPROCESS - AFTER organize_note, result keys: {list(result.keys())}")
 
         # 결과 저장
         organized_content = result.get("content", "")
@@ -384,14 +364,10 @@ async def reprocess_note(
         db.commit()
 
         # 프로 사용자 + 오답노트인 경우 취약 개념 추출 및 저장
-        import os
-        debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'debug.log')
-        with open(debug_path, 'a') as f:
-            f.write(f"[reprocess {note_id}] user={user is not None}, plan={user.plan.value if user else 'N/A'}, note_type={detected_note_type_str}\n")
+        debug_log(note_id, f"REPROCESS - user={user is not None}, plan={user.plan.value if user else 'N/A'}, note_type={detected_note_type_str}")
         if user and user.plan == UserPlan.PRO and detected_note_type_str == "error_note":
             try:
-                with open(debug_path, 'a') as f:
-                    f.write(f"[reprocess {note_id}] Pro user - extracting weak concepts...\n")
+                debug_log(note_id, "REPROCESS - Pro user - extracting weak concepts...")
                 weak_concepts = await ai_service.extract_weak_concepts(
                     organized_content=organized_content,
                     subject=detected_subject_str,
