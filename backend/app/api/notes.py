@@ -101,6 +101,36 @@ async def list_notes(
     return result
 
 
+# 주의: 이 라우트는 /{note_id} 보다 먼저 정의해야 함 (라우팅 우선순위)
+@router.get("/user/concept-cards")
+async def get_user_concept_cards(
+    subject: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """
+    사용자의 전체 Concept Card 조회 (문제 생성용)
+
+    - **subject**: 과목 필터 (math, korean, english 등)
+    - **limit**: 가져올 카드 수 (최대 100)
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+    if limit > 100:
+        limit = 100
+
+    query = db.query(ConceptCard).filter(ConceptCard.user_id == current_user.id)
+
+    if subject:
+        query = query.filter(ConceptCard.subject == subject)
+
+    cards = query.order_by(ConceptCard.created_at.desc()).limit(limit).all()
+
+    return [card.to_dict() for card in cards]
+
+
 @router.get("/{note_id}", response_model=NoteResponse)
 async def get_note(
     note_id: int,
@@ -193,34 +223,5 @@ async def get_concept_cards(
         raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
 
     cards = db.query(ConceptCard).filter(ConceptCard.note_id == note_id).all()
-
-    return [card.to_dict() for card in cards]
-
-
-@router.get("/user/concept-cards")
-async def get_user_concept_cards(
-    subject: Optional[str] = None,
-    limit: int = 50,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
-):
-    """
-    사용자의 전체 Concept Card 조회 (문제 생성용)
-
-    - **subject**: 과목 필터 (math, korean, english 등)
-    - **limit**: 가져올 카드 수 (최대 100)
-    """
-    if not current_user:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-
-    if limit > 100:
-        limit = 100
-
-    query = db.query(ConceptCard).filter(ConceptCard.user_id == current_user.id)
-
-    if subject:
-        query = query.filter(ConceptCard.subject == subject)
-
-    cards = query.order_by(ConceptCard.created_at.desc()).limit(limit).all()
 
     return [card.to_dict() for card in cards]
