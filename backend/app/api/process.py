@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.models.note import Note, ProcessStatus, Subject, NoteType, OrganizeMethod
 from app.models.user import User, UserPlan
 from app.models.weak_concept import UserWeakConcept
+from app.models.concept_card import ConceptCard, CardType
 from app.schemas.note import ProcessResponse
 from app.services.ocr_service import ocr_service
 from app.services.ai_service import ai_service
@@ -215,6 +216,47 @@ async def process_note_pipeline(note_id: int):
             except Exception as e:
                 with open('./debug.log', 'a') as f:
                     f.write(f"[{note_id}] Weak concept extraction error: {str(e)}\n")
+
+        # Concept Card 추출 및 저장 (문제 생성용)
+        try:
+            with open('./debug.log', 'a') as f:
+                f.write(f"[{note_id}] Extracting concept cards...\n")
+
+            concept_cards = await ai_service.extract_concept_cards(
+                organized_content=organized_content,
+                subject=detected_subject_str,
+                unit=detected_unit,
+                note_type=detected_note_type_str
+            )
+
+            for card_data in concept_cards:
+                # CardType enum 변환
+                try:
+                    card_type = CardType(card_data.get("card_type", "concept"))
+                except ValueError:
+                    card_type = CardType.CONCEPT
+
+                new_card = ConceptCard(
+                    note_id=note_id,
+                    user_id=note.user_id,
+                    card_type=card_type,
+                    title=card_data.get("title", ""),
+                    subject=detected_subject_str,
+                    unit_id=detected_unit,
+                    unit_name=detected_unit,
+                    content=card_data.get("content", {}),
+                    common_mistakes=card_data.get("common_mistakes", []),
+                    evidence_spans=card_data.get("evidence_spans", [])
+                )
+                db.add(new_card)
+
+            db.commit()
+            with open('./debug.log', 'a') as f:
+                f.write(f"[{note_id}] Saved {len(concept_cards)} concept cards\n")
+
+        except Exception as e:
+            with open('./debug.log', 'a') as f:
+                f.write(f"[{note_id}] Concept card extraction error: {str(e)}\n")
 
         with open('./debug.log', 'a') as f:
             f.write(f"[{note_id}] AI processing completed\n")

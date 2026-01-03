@@ -689,5 +689,136 @@ JSON:"""
             return []
 
 
+    async def extract_concept_cards(
+        self,
+        organized_content: str,
+        subject: str,
+        unit: str = "",
+        note_type: str = "general"
+    ) -> list:
+        """
+        정리된 노트에서 Concept Card 추출
+
+        Args:
+            organized_content: 정리된 노트 내용 (마크다운 또는 JSON)
+            subject: 과목
+            unit: 단원
+            note_type: 노트 타입 (general, error_note, vocab)
+
+        Returns:
+            list: [
+                {
+                    "card_type": "concept|formula|passage|vocab|...",
+                    "title": "개념 제목",
+                    "content": {...},  # 카드 타입별 다른 구조
+                    "common_mistakes": [...],
+                    "evidence_spans": [...]
+                },
+                ...
+            ]
+        """
+        # 과목별 카드 타입 가이드
+        card_type_guide = {
+            "math": "concept, formula, solution 중 선택",
+            "english": "passage, vocab, grammar 중 선택",
+            "korean": "concept, literature 중 선택",
+            "science": "concept, process, experiment, diagram 중 선택",
+            "history": "concept, timeline, terms 중 선택",
+            "social": "concept, terms 중 선택",
+        }.get(subject, "concept")
+
+        # 콘텐츠 압축 (너무 길면 토큰 낭비)
+        content_preview = organized_content[:3000] if len(organized_content) > 3000 else organized_content
+
+        prompt = f"""다음 정리된 노트에서 핵심 개념을 Concept Card로 추출하세요.
+
+[과목]: {subject}
+[단원]: {unit or "미지정"}
+[노트 타입]: {note_type}
+[카드 타입 선택]: {card_type_guide}
+
+[정리된 노트]:
+{content_preview}
+
+[출력 규칙]
+1. 핵심 개념 3~5개를 Concept Card로 추출
+2. 각 카드는 문제 생성에 활용될 수 있도록 구조화
+3. common_mistakes는 학생들이 자주 틀리는 부분
+4. evidence_spans는 원본 노트에서 어디서 추출했는지
+
+[출력 형식 - JSON 배열만]
+```json
+[
+  {{
+    "card_type": "concept",
+    "title": "개념 제목",
+    "content": {{
+      "definition": "정의",
+      "key_points": ["핵심1", "핵심2"],
+      "formula": "공식 (있으면)",
+      "examples": ["예시1"]
+    }},
+    "common_mistakes": ["자주 틀리는 부분1", "자주 틀리는 부분2"],
+    "evidence_spans": ["섹션1", "2번째 문단"]
+  }}
+]
+```
+
+JSON:"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-5-mini-2025-08-07",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "노트에서 핵심 개념을 Concept Card로 추출하는 분석가입니다. JSON 배열만 출력합니다."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_completion_tokens=2000
+            )
+
+            result = response.choices[0].message.content
+            if not result:
+                print("[AI] Concept Card 응답이 비어있음", flush=True)
+                return []
+
+            result = result.strip()
+
+            # JSON 파싱
+            if "```json" in result:
+                result = result.split("```json")[1].split("```")[0].strip()
+            elif "```" in result:
+                result = result.split("```")[1].split("```")[0].strip()
+
+            cards = json.loads(result)
+
+            # 유효성 검사
+            if not isinstance(cards, list):
+                return []
+
+            valid_cards = []
+            for card in cards[:5]:  # 최대 5개
+                if isinstance(card, dict) and "title" in card and "content" in card:
+                    valid_cards.append({
+                        "card_type": card.get("card_type", "concept"),
+                        "title": str(card.get("title", ""))[:255],
+                        "content": card.get("content", {}),
+                        "common_mistakes": card.get("common_mistakes", []),
+                        "evidence_spans": card.get("evidence_spans", [])
+                    })
+
+            print(f"[AI] Concept Card 추출 완료: {len(valid_cards)}개", flush=True)
+            return valid_cards
+
+        except Exception as e:
+            print(f"[AI] Concept Card 추출 실패: {e}", flush=True)
+            return []
+
+
 # 싱글톤 인스턴스
 ai_service = AIService()

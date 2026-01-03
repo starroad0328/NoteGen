@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.models.weak_concept import UserWeakConcept
+from app.models.concept_card import ConceptCard
 from app.schemas.note import NoteResponse, NoteListResponse, NoteUpdate
 from app.api.auth import get_current_user
 
@@ -171,7 +172,55 @@ async def delete_note(
     # 관련 취약 개념 삭제
     db.query(UserWeakConcept).filter(UserWeakConcept.last_note_id == note_id).delete()
 
+    # 관련 Concept Card 삭제
+    db.query(ConceptCard).filter(ConceptCard.note_id == note_id).delete()
+
     db.delete(note)
     db.commit()
 
     return {"message": "노트가 삭제되었습니다.", "note_id": note_id}
+
+
+@router.get("/{note_id}/concept-cards")
+async def get_concept_cards(
+    note_id: int,
+    db: Session = Depends(get_db)
+):
+    """노트의 Concept Card 목록 조회"""
+    note = db.query(Note).filter(Note.id == note_id).first()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+
+    cards = db.query(ConceptCard).filter(ConceptCard.note_id == note_id).all()
+
+    return [card.to_dict() for card in cards]
+
+
+@router.get("/user/concept-cards")
+async def get_user_concept_cards(
+    subject: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """
+    사용자의 전체 Concept Card 조회 (문제 생성용)
+
+    - **subject**: 과목 필터 (math, korean, english 등)
+    - **limit**: 가져올 카드 수 (최대 100)
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+    if limit > 100:
+        limit = 100
+
+    query = db.query(ConceptCard).filter(ConceptCard.user_id == current_user.id)
+
+    if subject:
+        query = query.filter(ConceptCard.subject == subject)
+
+    cards = query.order_by(ConceptCard.created_at.desc()).limit(limit).all()
+
+    return [card.to_dict() for card in cards]

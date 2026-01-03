@@ -12,3 +12,4 @@ from app.models.subscription import (
     SubscriptionStatus, PaymentProvider
 )
 from app.models.weak_concept import UserWeakConcept
+from app.models.concept_card import ConceptCard, CardType

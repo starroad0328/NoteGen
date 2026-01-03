@@ -403,4 +403,40 @@ export const weakConceptsAPI = {
   },
 }
 
+/**
+ * Concept Card API (문제 생성용)
+ */
+export interface ConceptCard {
+  id: number
+  note_id: number
+  card_type: string
+  title: string
+  subject?: string
+  unit_id?: string
+  unit_name?: string
+  content: Record<string, any>
+  common_mistakes?: string[]
+  evidence_spans?: string[]
+  created_at: string
+}
+
+export const conceptCardsAPI = {
+  // 노트별 Concept Card 조회
+  getByNote: async (noteId: number): Promise<ConceptCard[]> => {
+    const response = await apiClient.get(`/api/notes/${noteId}/concept-cards`)
+    return response.data
+  },
+
+  // 사용자 전체 Concept Card 조회
+  getUserCards: async (token: string, subject?: string, limit: number = 50): Promise<ConceptCard[]> => {
+    const params: Record<string, any> = { limit }
+    if (subject) params.subject = subject
+    const response = await apiClient.get('/api/notes/user/concept-cards', {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+}
+
 export default apiClient
