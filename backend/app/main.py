@@ -113,6 +113,23 @@ async def startup_event():
     print(f"[INFO] API Docs: http://localhost:8000/docs")
     print("=" * 50)
 
+    # 데이터베이스 마이그레이션 (새 컬럼 추가)
+    try:
+        from sqlalchemy import text
+        db = get_db_session()
+
+        # detection_cache 컬럼 추가 (없으면)
+        try:
+            db.execute(text("ALTER TABLE notes ADD COLUMN detection_cache TEXT"))
+            db.commit()
+            print("[MIGRATION] Added detection_cache column to notes table")
+        except Exception:
+            db.rollback()  # 이미 존재하면 무시
+
+        db.close()
+    except Exception as e:
+        print(f"[WARN] Migration check failed: {e}")
+
     # 교육과정 데이터 초기화
     try:
         db = get_db_session()
