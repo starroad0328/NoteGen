@@ -464,4 +464,45 @@ export const conceptCardsAPI = {
   },
 }
 
+/**
+ * 정리법 템플릿 API
+ */
+export interface OrganizeTemplate {
+  id: number
+  name: string
+  description?: string
+  icon: string
+  output_structure: string
+  required_plan: string
+  subject?: string
+  is_system: boolean
+  usage_count: number
+  created_at: string
+}
+
+export interface TemplateListResponse {
+  templates: OrganizeTemplate[]
+  total: number
+}
+
+export const templatesAPI = {
+  list: async (subject?: string, plan?: string, sort: string = 'popular'): Promise<TemplateListResponse> => {
+    const params: Record<string, any> = { sort }
+    if (subject) params.subject = subject
+    if (plan) params.plan = plan
+    const response = await apiClient.get('/api/templates', { params })
+    return response.data
+  },
+
+  get: async (templateId: number): Promise<OrganizeTemplate & { prompt: string; system_message: string }> => {
+    const response = await apiClient.get(`/api/templates/${templateId}`)
+    return response.data
+  },
+
+  use: async (templateId: number): Promise<{ message: string; usage_count: number }> => {
+    const response = await apiClient.post(`/api/templates/${templateId}/use`)
+    return response.data
+  },
+}
+
 export default apiClient

@@ -174,7 +174,12 @@ export default function HomeTab() {
 
         {/* 정리 방식 */}
         <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>정리 방식</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>정리 방식</Text>
+            <TouchableOpacity onPress={() => router.push('/templates')}>
+              <Text style={[styles.moreLink, { color: colors.primary }]}>더보기</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'basic_summary' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
             onPress={() => setOrganizeMethod('basic_summary')}
@@ -287,10 +292,19 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
+  },
+  moreLink: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   imageButtons: {
     flexDirection: 'row',
