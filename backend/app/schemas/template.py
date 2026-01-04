@@ -23,6 +23,7 @@ class TemplateResponse(TemplateBase):
     subject: Optional[str] = None
     is_system: bool
     usage_count: int
+    like_count: int = 0
     created_at: datetime
 
     class Config:

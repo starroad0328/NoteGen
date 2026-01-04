@@ -477,7 +477,13 @@ export interface OrganizeTemplate {
   subject?: string
   is_system: boolean
   usage_count: number
+  like_count: number
   created_at: string
+}
+
+export interface TemplateDetailResponse extends OrganizeTemplate {
+  prompt: string
+  system_message: string
 }
 
 export interface TemplateListResponse {
@@ -494,13 +500,61 @@ export const templatesAPI = {
     return response.data
   },
 
-  get: async (templateId: number): Promise<OrganizeTemplate & { prompt: string; system_message: string }> => {
+  get: async (templateId: number): Promise<TemplateDetailResponse> => {
     const response = await apiClient.get(`/api/templates/${templateId}`)
     return response.data
   },
 
   use: async (templateId: number): Promise<{ message: string; usage_count: number }> => {
     const response = await apiClient.post(`/api/templates/${templateId}/use`)
+    return response.data
+  },
+
+  // 구독한 정리법 목록
+  getSubscribed: async (token: string): Promise<TemplateListResponse> => {
+    const response = await apiClient.get('/api/templates/subscribed/list', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 정리법 구독
+  subscribe: async (token: string, templateId: number): Promise<{ message: string; subscribed: boolean }> => {
+    const response = await apiClient.post(`/api/templates/${templateId}/subscribe`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 정리법 구독 해제
+  unsubscribe: async (token: string, templateId: number): Promise<{ message: string; subscribed: boolean }> => {
+    const response = await apiClient.delete(`/api/templates/${templateId}/subscribe`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 좋아요
+  like: async (token: string, templateId: number): Promise<{ message: string; liked: boolean; like_count: number }> => {
+    const response = await apiClient.post(`/api/templates/${templateId}/like`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 좋아요 취소
+  unlike: async (token: string, templateId: number): Promise<{ message: string; liked: boolean; like_count: number }> => {
+    const response = await apiClient.delete(`/api/templates/${templateId}/like`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 좋아요한 정리법 ID 목록
+  getLikedIds: async (token: string): Promise<{ liked_ids: number[] }> => {
+    const response = await apiClient.get('/api/templates/liked/list', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     return response.data
   },
 }

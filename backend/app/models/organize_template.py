@@ -45,6 +45,7 @@ class OrganizeTemplate(Base):
 
     # 통계
     usage_count = Column(Integer, default=0)
+    like_count = Column(Integer, default=0)
 
     # 시간
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -59,3 +60,31 @@ class OrganizeTemplate(Base):
     def increment_usage(self):
         """사용 횟수 증가"""
         self.usage_count += 1
+
+
+class UserTemplateSubscription(Base):
+    """사용자 정리법 구독"""
+    __tablename__ = "user_template_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("organize_templates.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # 관계
+    user = relationship("User", backref="template_subscriptions")
+    template = relationship("OrganizeTemplate", backref="subscribers")
+
+
+class UserTemplateLike(Base):
+    """사용자 정리법 좋아요"""
+    __tablename__ = "user_template_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("organize_templates.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # 관계
+    user = relationship("User", backref="template_likes")
+    template = relationship("OrganizeTemplate", backref="likes")

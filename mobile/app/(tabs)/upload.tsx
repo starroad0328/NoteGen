@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Alert } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { uploadAPI, authAPI, UsageInfo } from '../../services/api'
+import { uploadAPI, authAPI, templatesAPI, UsageInfo, OrganizeTemplate } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -15,15 +15,27 @@ export default function HomeTab() {
   const { user, token, loading } = useAuth()
   const { colors } = useTheme()
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
-  const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'vocab'>('basic_summary')
+  const [organizeMethod, setOrganizeMethod] = useState<string>('basic_summary')
   const [uploading, setUploading] = useState(false)
   const [usage, setUsage] = useState<UsageInfo | null>(null)
+  const [subscribedTemplates, setSubscribedTemplates] = useState<OrganizeTemplate[]>([])
 
-  // 탭 포커스될 때마다 사용량 새로고침
+  // 기본 정리법 (항상 표시)
+  const defaultMethods = [
+    { id: 'basic_summary', icon: '📋', name: '기본 요약 정리', desc: '핵심 내용을 간결하게 정리' },
+    { id: 'cornell', icon: '📐', name: '코넬식 정리', desc: '키워드 + 본문 + 요약 구조' },
+    { id: 'vocab', icon: '📚', name: '단어장', desc: '단어 + 뜻 + 예문 표 정리' },
+  ]
+
+  // 탭 포커스될 때마다 사용량 및 구독 정리법 새로고침
   useFocusEffect(
     useCallback(() => {
       if (token) {
         authAPI.getUsage(token).then(setUsage).catch(console.error)
+        // 구독한 정리법 불러오기
+        templatesAPI.getSubscribed(token)
+          .then(result => setSubscribedTemplates(result.templates))
+          .catch(console.error)
       }
     }, [token])
   )
@@ -180,36 +192,43 @@ export default function HomeTab() {
               <Text style={[styles.moreLink, { color: colors.primary }]}>더보기</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'basic_summary' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
-            onPress={() => setOrganizeMethod('basic_summary')}
-          >
-            <Text style={styles.methodIcon}>📋</Text>
-            <View style={styles.methodInfo}>
-              <Text style={[styles.methodTitle, { color: colors.text }]}>기본 요약 정리</Text>
-              <Text style={[styles.methodDesc, { color: colors.textLight }]}>핵심 내용을 간결하게 정리</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'cornell' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
-            onPress={() => setOrganizeMethod('cornell')}
-          >
-            <Text style={styles.methodIcon}>📐</Text>
-            <View style={styles.methodInfo}>
-              <Text style={[styles.methodTitle, { color: colors.text }]}>코넬식 정리</Text>
-              <Text style={[styles.methodDesc, { color: colors.textLight }]}>키워드 + 본문 + 요약 구조</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'vocab' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
-            onPress={() => setOrganizeMethod('vocab')}
-          >
-            <Text style={styles.methodIcon}>📚</Text>
-            <View style={styles.methodInfo}>
-              <Text style={[styles.methodTitle, { color: colors.text }]}>단어장</Text>
-              <Text style={[styles.methodDesc, { color: colors.textLight }]}>단어 + 뜻 + 예문 표 정리</Text>
-            </View>
-          </TouchableOpacity>
+
+          {/* 기본 정리법 */}
+          {defaultMethods.map((method) => (
+            <TouchableOpacity
+              key={method.id}
+              style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === method.id && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
+              onPress={() => setOrganizeMethod(method.id)}
+            >
+              <Text style={styles.methodIcon}>{method.icon}</Text>
+              <View style={styles.methodInfo}>
+                <Text style={[styles.methodTitle, { color: colors.text }]}>{method.name}</Text>
+                <Text style={[styles.methodDesc, { color: colors.textLight }]}>{method.desc}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+
+          {/* 구독한 정리법 */}
+          {subscribedTemplates.length > 0 && (
+            <>
+              <Text style={[styles.subsectionTitle, { color: colors.textLight }]}>구독한 정리법</Text>
+              {subscribedTemplates.map((template) => (
+                <TouchableOpacity
+                  key={`template_${template.id}`}
+                  style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === `template_${template.id}` && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
+                  onPress={() => setOrganizeMethod(`template_${template.id}`)}
+                >
+                  <Text style={styles.methodIcon}>{template.icon}</Text>
+                  <View style={styles.methodInfo}>
+                    <Text style={[styles.methodTitle, { color: colors.text }]}>{template.name}</Text>
+                    {template.description && (
+                      <Text style={[styles.methodDesc, { color: colors.textLight }]}>{template.description}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
         </View>
 
         {/* 정리 시작 버튼 */}
@@ -305,6 +324,12 @@ const styles = StyleSheet.create({
   moreLink: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  subsectionTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 12,
+    marginBottom: 8,
   },
   imageButtons: {
     flexDirection: 'row',

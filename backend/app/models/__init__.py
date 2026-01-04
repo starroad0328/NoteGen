@@ -13,4 +13,4 @@ from app.models.subscription import (
 )
 from app.models.weak_concept import UserWeakConcept
 from app.models.concept_card import ConceptCard, CardType
-from app.models.organize_template import OrganizeTemplate, OutputStructure
+from app.models.organize_template import OrganizeTemplate, OutputStructure, UserTemplateSubscription, UserTemplateLike
