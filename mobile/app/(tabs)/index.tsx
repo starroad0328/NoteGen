@@ -129,17 +129,17 @@ export default function HomeTab() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
+            onPress={() => router.push('/templates')}
+          >
+            <Text style={styles.quickActionIcon}>🛒</Text>
+            <Text style={[styles.quickActionText, { color: colors.text }]}>정리법샵</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
             onPress={() => router.push('/(tabs)/practice')}
           >
             <Text style={styles.quickActionIcon}>🧠</Text>
             <Text style={[styles.quickActionText, { color: colors.text }]}>문제 풀기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
-            onPress={() => router.push('/(tabs)/my')}
-          >
-            <Text style={styles.quickActionIcon}>💎</Text>
-            <Text style={[styles.quickActionText, { color: colors.text }]}>내 플랜</Text>
           </TouchableOpacity>
         </View>
 
