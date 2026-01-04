@@ -40,6 +40,7 @@ class ProcessStatus(str, enum.Enum):
     """처리 상태"""
     UPLOADING = "uploading"  # 업로드 중
     OCR_PROCESSING = "ocr_processing"  # OCR 처리 중
+    CONFIRMATION_NEEDED = "confirmation_needed"  # 사용자 확인 필요 (오답노트 감지)
     AI_ORGANIZING = "ai_organizing"  # AI 정리 중
     COMPLETED = "completed"  # 완료
     FAILED = "failed"  # 실패
@@ -97,6 +98,9 @@ class Note(Base):
 
     # 진행 상태 메시지 (AI 단계 표시용)
     progress_message = Column(String(100), nullable=True)
+
+    # 중간 처리 결과 캐시 (confirmation_needed 상태에서 사용)
+    detection_cache = Column(Text, nullable=True)  # JSON: refined_text, structure 등
 
     def __repr__(self):
         return f"<Note(id={self.id}, title='{self.title}', status='{self.status}')>"

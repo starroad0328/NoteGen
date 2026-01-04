@@ -189,6 +189,13 @@ export const processAPI = {
     const response = await apiClient.post(`/api/process/${noteId}/reprocess`)
     return response.data
   },
+
+  confirmType: async (noteId: number, convertToErrorNote: boolean): Promise<ProcessResponse> => {
+    const response = await apiClient.post(`/api/process/${noteId}/confirm-type`, null, {
+      params: { convert_to_error_note: convertToErrorNote }
+    })
+    return response.data
+  },
 }
 
 /**

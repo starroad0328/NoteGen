@@ -37,6 +37,95 @@ class AIService:
                 return content
         return None
 
+    async def detect_note_type_only(
+        self,
+        ocr_text: str,
+        ocr_metadata: Optional[Dict] = None,
+        ai_model: Optional[AIModel] = None,
+        school_level: Optional[SchoolLevel] = None,
+        grade: Optional[int] = None
+    ) -> Dict:
+        """
+        Step 0 + Step 1만 실행 (노트 타입 감지용)
+
+        Returns:
+            Dict: {
+                "detected_subject": 감지된 과목,
+                "detected_note_type": 감지된 노트 타입,
+                "detected_unit": 감지된 단원,
+                "refined_text": 정제된 OCR 텍스트,
+                "structure": 구조 분석 결과,
+                "curriculum_context": 교육과정 컨텍스트
+            }
+        """
+        if not ocr_text or not ocr_text.strip():
+            raise ValueError("감지할 텍스트가 비어있습니다.")
+
+        if ai_model is None:
+            ai_model = AIModel.GPT_5_MINI
+
+        blocks_data = self._get_blocks_for_llm(ocr_metadata) if ocr_metadata else None
+
+        # 0단계: OCR 정제
+        print("[AI] Detect - 0단계: OCR 정제...", flush=True)
+        refined_text = await self._step0_refine_ocr(ocr_text, AIModel.GPT_5_NANO)
+
+        # 1단계: 구조 파악
+        print("[AI] Detect - 1단계: 구조 분석...", flush=True)
+        curriculum_context = get_curriculum_context(school_level, grade)
+
+        analysis_result = await self._step1_analyze_structure(
+            blocks_data, refined_text, ai_model, school_level, grade, curriculum_context
+        )
+
+        detected_subject = analysis_result.get("subject", "other")
+        detected_note_type = analysis_result.get("note_type", "general")
+        detected_unit = analysis_result.get("detected_unit", "")
+        structure_text = analysis_result.get("structure", "")
+
+        print(f"[AI] Detect 완료: subject={detected_subject}, type={detected_note_type}", flush=True)
+
+        return {
+            "detected_subject": detected_subject,
+            "detected_note_type": detected_note_type,
+            "detected_unit": detected_unit,
+            "refined_text": refined_text,
+            "structure": structure_text,
+            "curriculum_context": curriculum_context or ""
+        }
+
+    async def continue_content_generation(
+        self,
+        refined_text: str,
+        structure: str,
+        method: OrganizeMethod,
+        detected_subject: str,
+        detected_note_type: str,
+        ocr_metadata: Optional[Dict] = None,
+        ai_model: Optional[AIModel] = None,
+        curriculum_context: str = ""
+    ) -> str:
+        """
+        Step 2만 실행 (콘텐츠 생성)
+
+        Returns:
+            str: 정리된 노트 콘텐츠
+        """
+        if ai_model is None:
+            ai_model = AIModel.GPT_5_MINI
+
+        blocks_data = self._get_blocks_for_llm(ocr_metadata) if ocr_metadata else None
+
+        print(f"[AI] Continue - 2단계 시작 (method={method.value})...", flush=True)
+
+        organized = await self._step2_organize_with_structure(
+            blocks_data, refined_text, structure, method, ai_model, curriculum_context,
+            detected_subject, detected_note_type
+        )
+
+        print(f"[AI] Continue 완료. 결과 길이: {len(organized)}", flush=True)
+        return organized
+
     async def organize_note(
         self,
         ocr_text: str,

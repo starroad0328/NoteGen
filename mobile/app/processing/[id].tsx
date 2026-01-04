@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { processAPI, notesAPI } from '../../services/api'
+import { processAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
 const MAX_RETRIES = 5
@@ -54,58 +54,65 @@ export default function ProcessingScreen() {
         const progressMap: Record<string, number> = {
           uploading: 25,
           ocr_processing: 50,
+          confirmation_needed: 60,
           ai_organizing: 75,
           completed: 100,
         }
         setProgress(progressMap[result.status] || 25)
 
-        // 완료 시 노트 페이지로 이동
-        if (result.status === 'completed') {
-          // AI가 오답노트로 감지했는데 사용자가 다른 걸 선택했으면 확인
-          const isErrorNote = result.detected_note_type === 'error_note'
-          const userSelectedOther = result.organize_method !== 'error_note'
-
-          if (isErrorNote && userSelectedOther && !hasAskedRef.current) {
-            hasAskedRef.current = true
-            Alert.alert(
-              '오답노트로 변경할까요?',
-              'AI가 이 필기를 오답 문제로 인식했어요.\n오답노트로 변경하면 취약점 분석이 가능해요.',
-              [
-                {
-                  text: '아니요',
-                  style: 'cancel',
-                  onPress: () => {
-                    router.replace(`/notes/${noteId}`)
-                  }
-                },
-                {
-                  text: '네, 변경할게요',
-                  onPress: async () => {
-                    try {
-                      // 오답노트로 변경
-                      await notesAPI.convertToErrorNote(noteId, token)
-                      // 재처리
-                      await processAPI.reprocess(noteId)
-                      // 다시 처리 화면으로 (재처리 상태 보여주기)
-                      setStatus('ai_organizing')
-                      setMessage('오답노트로 재처리 중...')
-                      setProgress(75)
-                      hasAskedRef.current = true
-                      // 폴링 재시작
-                      setTimeout(() => {
-                        router.replace(`/processing/${noteId}`)
-                      }, 500)
-                    } catch (error) {
-                      console.error('오답노트 변경 실패:', error)
-                      router.replace(`/notes/${noteId}`)
-                    }
+        // 확인 필요 상태 - 오답노트로 변경할지 물어보기
+        if (result.status === 'confirmation_needed' && !hasAskedRef.current) {
+          hasAskedRef.current = true
+          Alert.alert(
+            '오답노트로 변경할까요?',
+            'AI가 이 필기를 오답 문제로 인식했어요.\n오답노트로 변경하면 취약점 분석이 가능해요.',
+            [
+              {
+                text: '아니요, 그대로 진행',
+                style: 'cancel',
+                onPress: async () => {
+                  try {
+                    setStatus('ai_organizing')
+                    setMessage('AI 정리 생성 중...')
+                    setProgress(75)
+                    // 원래 방식으로 계속 처리
+                    await processAPI.confirmType(noteId, false)
+                    // 폴링 재시작
+                    hasAskedRef.current = false
+                    timeoutRef.current = setTimeout(checkStatus, BASE_DELAY)
+                  } catch (error) {
+                    console.error('처리 계속 실패:', error)
+                    setStatus('error')
+                    setMessage('처리 중 오류가 발생했습니다.')
                   }
                 }
-              ]
-            )
-            return // 폴링 중지
-          }
+              },
+              {
+                text: '네, 오답노트로',
+                onPress: async () => {
+                  try {
+                    setStatus('ai_organizing')
+                    setMessage('오답노트로 정리 중...')
+                    setProgress(75)
+                    // 오답노트로 변경 후 처리
+                    await processAPI.confirmType(noteId, true)
+                    // 폴링 재시작
+                    hasAskedRef.current = false
+                    timeoutRef.current = setTimeout(checkStatus, BASE_DELAY)
+                  } catch (error) {
+                    console.error('오답노트 변경 실패:', error)
+                    setStatus('error')
+                    setMessage('처리 중 오류가 발생했습니다.')
+                  }
+                }
+              }
+            ]
+          )
+          return // 폴링 중지, 사용자 응답 대기
+        }
 
+        // 완료 시 노트 페이지로 이동
+        if (result.status === 'completed') {
           setTimeout(() => {
             if (isMountedRef.current) {
               router.replace(`/notes/${noteId}`)
@@ -163,6 +170,8 @@ export default function ProcessingScreen() {
         return '📤'
       case 'ocr_processing':
         return '🔍'
+      case 'confirmation_needed':
+        return '❓'
       case 'ai_organizing':
         return '🤖'
       case 'completed':
@@ -181,6 +190,8 @@ export default function ProcessingScreen() {
         return '업로드 중'
       case 'ocr_processing':
         return 'OCR 처리 중'
+      case 'confirmation_needed':
+        return '확인 필요'
       case 'ai_organizing':
         return 'AI 정리 중'
       case 'completed':
