@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { processAPI } from '../../services/api'
+import { processAPI, notesAPI } from '../../services/api'
+import { useAuth } from '../../contexts/AuthContext'
 
 const MAX_RETRIES = 5
 const BASE_DELAY = 800  // 0.8초로 줄임
@@ -9,6 +10,7 @@ const BASE_DELAY = 800  // 0.8초로 줄임
 export default function ProcessingScreen() {
   const router = useRouter()
   const params = useLocalSearchParams()
+  const { token } = useAuth()
 
   // id가 배열일 수도 있으므로 처리
   const rawId = params.id
@@ -21,6 +23,7 @@ export default function ProcessingScreen() {
 
   const isMountedRef = useRef(true)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasAskedRef = useRef(false)  // 이미 물어봤는지 체크
 
   useEffect(() => {
     isMountedRef.current = true
@@ -58,6 +61,51 @@ export default function ProcessingScreen() {
 
         // 완료 시 노트 페이지로 이동
         if (result.status === 'completed') {
+          // AI가 오답노트로 감지했는데 사용자가 다른 걸 선택했으면 확인
+          const isErrorNote = result.detected_note_type === 'error_note'
+          const userSelectedOther = result.organize_method !== 'error_note'
+
+          if (isErrorNote && userSelectedOther && !hasAskedRef.current) {
+            hasAskedRef.current = true
+            Alert.alert(
+              '오답노트로 변경할까요?',
+              'AI가 이 필기를 오답 문제로 인식했어요.\n오답노트로 변경하면 취약점 분석이 가능해요.',
+              [
+                {
+                  text: '아니요',
+                  style: 'cancel',
+                  onPress: () => {
+                    router.replace(`/notes/${noteId}`)
+                  }
+                },
+                {
+                  text: '네, 변경할게요',
+                  onPress: async () => {
+                    try {
+                      // 오답노트로 변경
+                      await notesAPI.convertToErrorNote(noteId, token)
+                      // 재처리
+                      await processAPI.reprocess(noteId)
+                      // 다시 처리 화면으로 (재처리 상태 보여주기)
+                      setStatus('ai_organizing')
+                      setMessage('오답노트로 재처리 중...')
+                      setProgress(75)
+                      hasAskedRef.current = true
+                      // 폴링 재시작
+                      setTimeout(() => {
+                        router.replace(`/processing/${noteId}`)
+                      }, 500)
+                    } catch (error) {
+                      console.error('오답노트 변경 실패:', error)
+                      router.replace(`/notes/${noteId}`)
+                    }
+                  }
+                }
+              ]
+            )
+            return // 폴링 중지
+          }
+
           setTimeout(() => {
             if (isMountedRef.current) {
               router.replace(`/notes/${noteId}`)

@@ -178,6 +178,32 @@ async def update_note(
     return {"message": "노트 제목이 수정되었습니다.", "note_id": note_id, "title": note.title}
 
 
+@router.post("/{note_id}/convert-to-error-note")
+async def convert_to_error_note(
+    note_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """노트를 오답노트로 변경하고 재처리"""
+    from app.models.note import OrganizeMethod
+
+    note = db.query(Note).filter(Note.id == note_id).first()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+
+    # 권한 확인
+    if current_user and note.user_id and note.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+
+    # 오답노트로 변경
+    note.organize_method = OrganizeMethod.ERROR_NOTE
+
+    db.commit()
+
+    return {"message": "오답노트로 변경되었습니다.", "note_id": note_id}
+
+
 @router.delete("/{note_id}")
 async def delete_note(
     note_id: int,

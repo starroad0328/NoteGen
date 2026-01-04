@@ -56,3 +56,5 @@ class ProcessResponse(BaseModel):
     message: str
     organized_content: Optional[str] = None
     error_message: Optional[str] = None
+    detected_note_type: Optional[str] = None
+    organize_method: Optional[str] = None

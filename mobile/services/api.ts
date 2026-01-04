@@ -109,6 +109,8 @@ export interface ProcessResponse {
   message: string
   organized_content?: string
   error_message?: string
+  detected_note_type?: string
+  organize_method?: string
 }
 
 // React Native 이미지 타입
@@ -182,6 +184,11 @@ export const processAPI = {
     const response = await apiClient.get(`/api/process/${noteId}/status`)
     return response.data
   },
+
+  reprocess: async (noteId: number): Promise<ProcessResponse> => {
+    const response = await apiClient.post(`/api/process/${noteId}/reprocess`)
+    return response.data
+  },
 }
 
 /**
@@ -223,6 +230,15 @@ export const notesAPI = {
       headers['Authorization'] = `Bearer ${token}`
     }
     const response = await apiClient.patch(`/api/notes/${noteId}`, { title }, { headers })
+    return response.data
+  },
+
+  convertToErrorNote: async (noteId: number, token?: string | null): Promise<{ message: string; note_id: number }> => {
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    const response = await apiClient.post(`/api/notes/${noteId}/convert-to-error-note`, {}, { headers })
     return response.data
   },
 }

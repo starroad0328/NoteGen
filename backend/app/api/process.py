@@ -444,6 +444,8 @@ async def get_process_status(
         status=note.status,
         message=message,
         organized_content=note.organized_content if note.status == ProcessStatus.COMPLETED else None,
-        error_message=note.error_message if note.status == ProcessStatus.FAILED else None
+        error_message=note.error_message if note.status == ProcessStatus.FAILED else None,
+        detected_note_type=note.detected_note_type.value if note.detected_note_type else None,
+        organize_method=note.organize_method.value if note.organize_method else None
     )
 
