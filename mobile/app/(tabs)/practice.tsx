@@ -4,11 +4,11 @@
  */
 
 import { useState, useCallback } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import { weakConceptsAPI, WeakConceptsOverview, conceptCardsAPI, ConceptCard } from '../../services/api'
+import { weakConceptsAPI, WeakConceptsOverview, WeakConcept, conceptCardsAPI, ConceptCard } from '../../services/api'
 
 // 과목명 한글 변환
 const SUBJECT_NAMES: Record<string, string> = {
@@ -26,9 +26,12 @@ export default function ProTab() {
   const { user, token, loading: authLoading } = useAuth()
   const { colors } = useTheme()
   const [weakOverview, setWeakOverview] = useState<WeakConceptsOverview | null>(null)
+  const [weakConcepts, setWeakConcepts] = useState<WeakConcept[]>([])
   const [conceptCards, setConceptCards] = useState<ConceptCard[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [selectedConcept, setSelectedConcept] = useState<WeakConcept | null>(null)
+  const [showAllWeakConcepts, setShowAllWeakConcepts] = useState(false)
 
   const fetchData = async () => {
     if (!token) {
@@ -40,6 +43,10 @@ export default function ProTab() {
       const overview = await weakConceptsAPI.getOverview(token)
       setWeakOverview(overview)
 
+      // 취약점 전체 목록 조회
+      const concepts = await weakConceptsAPI.getList(token)
+      setWeakConcepts(concepts)
+
       // Concept Card 조회
       const cards = await conceptCardsAPI.getUserCards(token, undefined, 20)
       setConceptCards(cards)
@@ -48,6 +55,32 @@ export default function ProTab() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDeleteConcept = async (conceptId: number, conceptName: string) => {
+    Alert.alert(
+      '취약점 삭제',
+      `"${conceptName}"을(를) 삭제하시겠습니까?\n삭제하면 복구할 수 없습니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await weakConceptsAPI.delete(token!, conceptId)
+              // 목록에서 제거
+              setWeakConcepts(prev => prev.filter(c => c.id !== conceptId))
+              // 개요 새로고침
+              const overview = await weakConceptsAPI.getOverview(token!)
+              setWeakOverview(overview)
+            } catch (error) {
+              Alert.alert('오류', '삭제에 실패했습니다.')
+            }
+          },
+        },
+      ]
+    )
   }
 
   useFocusEffect(
@@ -135,28 +168,21 @@ export default function ProTab() {
             )}
           </View>
 
-          {isPro && weakOverview && weakOverview.total_weak_concepts > 0 ? (
+          {isPro && weakConcepts.filter(c => !c.concept.includes('검산')).length > 0 ? (
             <>
               {/* 취약 과목 요약 */}
               <View style={[styles.statsCard, { backgroundColor: colors.cardBg }]}>
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
                     <Text style={[styles.statNumber, { color: colors.primary }]}>
-                      {weakOverview.total_weak_concepts}
+                      {weakConcepts.filter(c => !c.concept.includes('검산')).length}
                     </Text>
                     <Text style={[styles.statLabel, { color: colors.textLight }]}>취약 개념</Text>
                   </View>
                   <View style={styles.statDivider} />
                   <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: '#EF4444' }]}>
-                      {weakOverview.total_errors}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: colors.textLight }]}>총 오답</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statItem}>
                     <Text style={[styles.statNumber, { color: colors.text }]}>
-                      {weakOverview.subjects.length}
+                      {[...new Set(weakConcepts.filter(c => !c.concept.includes('검산')).map(c => c.subject))].length}
                     </Text>
                     <Text style={[styles.statLabel, { color: colors.textLight }]}>과목</Text>
                   </View>
@@ -164,23 +190,28 @@ export default function ProTab() {
               </View>
 
               {/* 과목별 취약점 */}
-              {weakOverview.subjects.map((subj, idx) => (
-                <View key={idx} style={[styles.weakCard, { backgroundColor: colors.cardBg }]}>
-                  <View style={styles.weakHeader}>
-                    <Text style={[styles.weakSubject, { color: colors.text }]}>
-                      {subj.subject_name}
-                    </Text>
-                    <Text style={[styles.weakCount, { color: '#EF4444' }]}>
-                      {subj.total_errors}회 오답
-                    </Text>
+              {[...new Set(weakConcepts.filter(c => !c.concept.includes('검산')).map(c => c.subject))].map((subject) => {
+                const subjectConcepts = weakConcepts.filter(c => c.subject === subject && !c.concept.includes('검산'))
+                const totalErrors = subjectConcepts.reduce((sum, c) => sum + c.error_count, 0)
+                const topConcept = subjectConcepts.sort((a, b) => b.error_count - a.error_count)[0]
+                return (
+                  <View key={subject} style={[styles.weakCard, { backgroundColor: colors.cardBg }]}>
+                    <View style={styles.weakHeader}>
+                      <Text style={[styles.weakSubject, { color: colors.text }]}>
+                        {SUBJECT_NAMES[subject] || subject}
+                      </Text>
+                      <Text style={[styles.weakCount, { color: '#EF4444' }]}>
+                        {totalErrors}회 오답
+                      </Text>
+                    </View>
+                    {topConcept && (
+                      <Text style={[styles.weakConcept, { color: colors.textLight }]}>
+                        주요 취약점: {topConcept.concept}
+                      </Text>
+                    )}
                   </View>
-                  {subj.top_concept && (
-                    <Text style={[styles.weakConcept, { color: colors.textLight }]}>
-                      주요 취약점: {subj.top_concept}
-                    </Text>
-                  )}
-                </View>
-              ))}
+                )
+              })}
             </>
           ) : isPro ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.cardBg }]}>
@@ -199,6 +230,94 @@ export default function ProTab() {
             </View>
           )}
         </View>
+
+        {/* 취약점 목록 섹션 (PRO 전용) */}
+        {isPro && weakConcepts.filter(c => !c.concept.includes('검산')).length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>취약점 목록</Text>
+              <Text style={[styles.countBadge, { color: colors.textLight }]}>
+                {weakConcepts.filter(c => !c.concept.includes('검산')).length}개
+              </Text>
+            </View>
+            <Text style={[styles.sectionDesc, { color: colors.textLight }]}>
+              길게 눌러서 삭제할 수 있어요
+            </Text>
+
+            {weakConcepts
+              .filter(c => !c.concept.includes('검산'))
+              .slice(0, showAllWeakConcepts ? undefined : 2)
+              .map((concept) => (
+              <View key={concept.id}>
+                <TouchableOpacity
+                  style={[styles.weakListCard, { backgroundColor: colors.cardBg }]}
+                  onPress={() => setSelectedConcept(selectedConcept?.id === concept.id ? null : concept)}
+                  onLongPress={() => handleDeleteConcept(concept.id, concept.concept)}
+                  delayLongPress={500}
+                >
+                  <View style={styles.weakListHeader}>
+                    <View style={[styles.subjectBadge, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.subjectBadgeText, { color: colors.primary }]}>
+                        {SUBJECT_NAMES[concept.subject] || concept.subject}
+                      </Text>
+                    </View>
+                    <View style={[styles.errorCountBadge, { backgroundColor: '#FEE2E2' }]}>
+                      <Text style={styles.errorCountText}>{concept.error_count}회</Text>
+                    </View>
+                    <Text style={styles.expandIcon}>
+                      {selectedConcept?.id === concept.id ? '▲' : '▼'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.weakListTitle, { color: colors.text }]}>
+                    {concept.concept}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 상세 정보 (펼쳐졌을 때) */}
+                {selectedConcept?.id === concept.id && (
+                  <View style={[styles.weakDetailCard, { backgroundColor: colors.cardBg, borderColor: colors.primary }]}>
+                    {concept.last_note_title && (
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailLabel, { color: colors.textLight }]}>📝 출처 필기</Text>
+                        <Text style={[styles.detailValue, { color: colors.primary }]}>{concept.last_note_title}</Text>
+                      </View>
+                    )}
+                    {concept.unit && (
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailLabel, { color: colors.textLight }]}>📚 단원</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{concept.unit}</Text>
+                      </View>
+                    )}
+                    {concept.error_reason && (
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailLabel, { color: colors.textLight }]}>💡 틀린 이유</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{concept.error_reason}</Text>
+                      </View>
+                    )}
+                    <View style={styles.detailRow}>
+                      <Text style={[styles.detailLabel, { color: colors.textLight }]}>📅 마지막 오답</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>
+                        {new Date(concept.last_error_at).toLocaleDateString('ko-KR')}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            ))}
+
+            {/* 전체보기 버튼 */}
+            {weakConcepts.filter(c => !c.concept.includes('검산')).length > 2 && (
+              <TouchableOpacity
+                style={[styles.viewAllButton, { borderColor: colors.primary }]}
+                onPress={() => setShowAllWeakConcepts(!showAllWeakConcepts)}
+              >
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                  {showAllWeakConcepts ? '접기' : `전체보기 (${weakConcepts.filter(c => !c.concept.includes('검산')).length}개)`}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* 개념 카드 섹션 */}
         <View style={styles.section}>
@@ -492,6 +611,94 @@ const styles = StyleSheet.create({
   weakConcept: {
     fontSize: 13,
     marginTop: 6,
+  },
+
+  // 취약점 목록
+  countBadge: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  weakListCard: {
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  weakListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  subjectBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  subjectBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  errorCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  errorCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  weakListTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  weakListReason: {
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  weakListUnit: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  expandIcon: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 'auto',
+  },
+  weakDetailCard: {
+    marginTop: -6,
+    marginBottom: 10,
+    marginHorizontal: 4,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  detailRow: {
+    marginBottom: 10,
+  },
+  detailLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  viewAllButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // 개념 카드

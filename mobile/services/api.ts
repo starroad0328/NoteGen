@@ -361,6 +361,8 @@ export interface WeakConcept {
   error_count: number
   first_error_at: string
   last_error_at: string
+  last_note_id?: number
+  last_note_title?: string
 }
 
 export interface SubjectSummary {

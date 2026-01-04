@@ -13,6 +13,7 @@ from datetime import datetime
 from app.core.database import get_db
 from app.models.user import User, UserPlan
 from app.models.weak_concept import UserWeakConcept
+from app.models.note import Note
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -28,6 +29,8 @@ class WeakConceptResponse(BaseModel):
     error_count: int
     first_error_at: datetime
     last_error_at: datetime
+    last_note_id: Optional[int] = None
+    last_note_title: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -91,7 +94,28 @@ async def get_weak_concepts(
         UserWeakConcept.last_error_at.desc()
     ).limit(limit).all()
 
-    return concepts
+    # 노트 제목 추가
+    result = []
+    for concept in concepts:
+        concept_dict = {
+            "id": concept.id,
+            "subject": concept.subject,
+            "unit": concept.unit,
+            "concept": concept.concept,
+            "error_reason": concept.error_reason,
+            "error_count": concept.error_count,
+            "first_error_at": concept.first_error_at,
+            "last_error_at": concept.last_error_at,
+            "last_note_id": concept.last_note_id,
+            "last_note_title": None
+        }
+        if concept.last_note_id:
+            note = db.query(Note).filter(Note.id == concept.last_note_id).first()
+            if note:
+                concept_dict["last_note_title"] = note.title
+        result.append(concept_dict)
+
+    return result
 
 
 @router.get("/overview", response_model=WeakConceptsOverview)
