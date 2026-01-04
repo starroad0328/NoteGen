@@ -15,7 +15,7 @@ export default function HomeTab() {
   const { user, token, loading } = useAuth()
   const { colors } = useTheme()
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([])
-  const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'error_note' | 'vocab'>('basic_summary')
+  const [organizeMethod, setOrganizeMethod] = useState<'basic_summary' | 'cornell' | 'vocab'>('basic_summary')
   const [uploading, setUploading] = useState(false)
   const [usage, setUsage] = useState<UsageInfo | null>(null)
 
@@ -193,16 +193,6 @@ export default function HomeTab() {
             <View style={styles.methodInfo}>
               <Text style={[styles.methodTitle, { color: colors.text }]}>코넬식 정리</Text>
               <Text style={[styles.methodDesc, { color: colors.textLight }]}>키워드 + 본문 + 요약 구조</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodCard, { borderColor: colors.tabBarBorder }, organizeMethod === 'error_note' && { borderColor: colors.primary, backgroundColor: colors.cardBg }]}
-            onPress={() => setOrganizeMethod('error_note')}
-          >
-            <Text style={styles.methodIcon}>❌</Text>
-            <View style={styles.methodInfo}>
-              <Text style={[styles.methodTitle, { color: colors.text }]}>오답노트</Text>
-              <Text style={[styles.methodDesc, { color: colors.textLight }]}>문제 + 오답 + 정답 + 해설</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity

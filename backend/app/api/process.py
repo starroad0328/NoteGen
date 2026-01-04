@@ -136,12 +136,13 @@ async def process_note_pipeline(note_id: int):
         except ValueError:
             note.detected_note_type = NoteType.GENERAL
 
-        # 3. 확인 필요 여부 체크
+        # 3. 확인 필요 여부 체크 (V2로 미룸 - 비활성화)
         # 오답노트로 감지됐는데 사용자가 다른 방식을 선택한 경우
-        needs_confirmation = (
-            detected_note_type_str == "error_note" and
-            note.organize_method != OrganizeMethod.ERROR_NOTE
-        )
+        # needs_confirmation = (
+        #     detected_note_type_str == "error_note" and
+        #     note.organize_method != OrganizeMethod.ERROR_NOTE
+        # )
+        needs_confirmation = False  # V2까지 비활성화
 
         if needs_confirmation:
             debug_log(note_id, "Confirmation needed: detected error_note but user selected different method")
