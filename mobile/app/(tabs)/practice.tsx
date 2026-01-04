@@ -276,11 +276,16 @@ export default function ProTab() {
                 {/* 상세 정보 (펼쳐졌을 때) */}
                 {selectedConcept?.id === concept.id && (
                   <View style={[styles.weakDetailCard, { backgroundColor: colors.cardBg, borderColor: colors.primary }]}>
-                    {concept.last_note_title && (
-                      <View style={styles.detailRow}>
+                    {concept.last_note_title && concept.last_note_id && (
+                      <TouchableOpacity
+                        style={styles.detailRow}
+                        onPress={() => router.push(`/notes/${concept.last_note_id}`)}
+                      >
                         <Text style={[styles.detailLabel, { color: colors.textLight }]}>📝 출처 필기</Text>
-                        <Text style={[styles.detailValue, { color: colors.primary }]}>{concept.last_note_title}</Text>
-                      </View>
+                        <Text style={[styles.detailValue, { color: colors.primary, textDecorationLine: 'underline' }]}>
+                          {concept.last_note_title} →
+                        </Text>
+                      </TouchableOpacity>
                     )}
                     {concept.unit && (
                       <View style={styles.detailRow}>
