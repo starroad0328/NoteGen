@@ -133,6 +133,14 @@ async def startup_event():
         except Exception:
             db.rollback()  # 이미 존재하면 무시
 
+        # template_id 컬럼 추가 (없으면)
+        try:
+            db.execute(text("ALTER TABLE notes ADD COLUMN template_id INTEGER REFERENCES organize_templates(id)"))
+            db.commit()
+            print("[MIGRATION] Added template_id column to notes table")
+        except Exception:
+            db.rollback()  # 이미 존재하면 무시
+
         db.close()
     except Exception as e:
         print(f"[WARN] Migration check failed: {e}")
