@@ -103,10 +103,14 @@ class AIService:
         detected_note_type: str,
         ocr_metadata: Optional[Dict] = None,
         ai_model: Optional[AIModel] = None,
-        curriculum_context: str = ""
+        curriculum_context: str = "",
+        template_prompt: Optional[str] = None
     ) -> str:
         """
         Step 2만 실행 (콘텐츠 생성)
+
+        Args:
+            template_prompt: 정리법샵 템플릿의 커스텀 프롬프트 (있으면 우선 사용)
 
         Returns:
             str: 정리된 노트 콘텐츠
@@ -116,11 +120,14 @@ class AIService:
 
         blocks_data = self._get_blocks_for_llm(ocr_metadata) if ocr_metadata else None
 
-        print(f"[AI] Continue - 2단계 시작 (method={method.value})...", flush=True)
+        if template_prompt:
+            print(f"[AI] Continue - 2단계 시작 (template_prompt 사용)...", flush=True)
+        else:
+            print(f"[AI] Continue - 2단계 시작 (method={method.value})...", flush=True)
 
         organized = await self._step2_organize_with_structure(
             blocks_data, refined_text, structure, method, ai_model, curriculum_context,
-            detected_subject, detected_note_type
+            detected_subject, detected_note_type, template_prompt
         )
 
         print(f"[AI] Continue 완료. 결과 길이: {len(organized)}", flush=True)
@@ -490,10 +497,12 @@ class AIService:
         ai_model: AIModel,
         curriculum_context: str = "",
         detected_subject: str = "other",
-        detected_note_type: str = "general"
+        detected_note_type: str = "general",
+        template_prompt: Optional[str] = None
     ) -> str:
         """
         2단계: 타입별 프롬프트로 정리 생성
+        - 정리법샵 템플릿 프롬프트 우선 사용
         - 오답노트/단어장/일반필기 분기
         - 교육과정에 맞는 설명 제공
         """
@@ -504,6 +513,34 @@ class AIService:
         else:
             content = ocr_text
             block_count = 0
+
+        # 정리법샵 템플릿 프롬프트가 있으면 우선 사용
+        if template_prompt:
+            curriculum_section = f"\n{curriculum_context}\n" if curriculum_context else ""
+
+            prompt = f"""{template_prompt}
+{curriculum_section}
+[구조 참고]
+{structure}
+
+[필기 내용]
+{content}
+"""
+            system_message = "학생 필기 정리. 메타데이터 제거. 깔끔하게."
+
+            print(f"[AI] Using template prompt ({len(template_prompt)} chars)", flush=True)
+
+            response = self.client.chat.completions.create(
+                model=ai_model.value,
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=6000,
+                temperature=0.3
+            )
+
+            return response.choices[0].message.content.strip()
 
         # 노트 타입별 프롬프트 선택
         type_prompt, system_message = self._get_prompt_for_note_type(

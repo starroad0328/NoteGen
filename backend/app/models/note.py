@@ -3,7 +3,8 @@ Note Database Model
 노트 데이터베이스 모델
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 
@@ -73,6 +74,10 @@ class Note(Base):
         Enum(OrganizeMethod),
         default=OrganizeMethod.BASIC_SUMMARY
     )
+
+    # 정리법 템플릿 (정리법샵에서 선택한 경우)
+    template_id = Column(Integer, ForeignKey("organize_templates.id"), nullable=True)
+    template = relationship("OrganizeTemplate", backref="notes")
 
     # AI 감지 결과
     detected_subject = Column(

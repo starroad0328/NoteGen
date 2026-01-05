@@ -13,6 +13,7 @@ from app.models.note import Note, ProcessStatus, Subject, NoteType, OrganizeMeth
 from app.models.user import User, UserPlan
 from app.models.weak_concept import UserWeakConcept
 from app.models.concept_card import ConceptCard, CardType
+from app.models.organize_template import OrganizeTemplate
 from app.schemas.note import ProcessResponse
 from app.services.ocr_service import ocr_service
 from app.services.ai_service import ai_service
@@ -110,6 +111,14 @@ async def process_note_pipeline(note_id: int):
                 ai_model = user.get_default_model()
                 debug_log(note_id, f"User: {user.grade_display}, plan={user.plan.value}")
 
+        # 정리법 템플릿 조회
+        template_prompt = None
+        if note.template_id:
+            template = db.query(OrganizeTemplate).filter(OrganizeTemplate.id == note.template_id).first()
+            if template:
+                template_prompt = template.prompt
+                debug_log(note_id, f"Using template: {template.name} (id={template.id})")
+
         # Step 0 + Step 1 실행 (노트 타입 감지)
         detection_result = await ai_service.detect_note_type_only(
             ocr_text=ocr_text,
@@ -174,7 +183,8 @@ async def process_note_pipeline(note_id: int):
             detected_note_type_str,
             detected_unit,
             ocr_metadata,
-            ai_model
+            ai_model,
+            template_prompt
         )
 
     except Exception as e:
@@ -195,7 +205,8 @@ async def continue_processing(
     detected_note_type_str: str,
     detected_unit: str,
     ocr_metadata,
-    ai_model
+    ai_model,
+    template_prompt: str = None
 ):
     """Step 2 이후 처리 (콘텐츠 생성 + 취약 개념/카드 추출)"""
     note_id = note.id
@@ -213,7 +224,8 @@ async def continue_processing(
         detected_note_type=detected_note_type_str,
         ocr_metadata=ocr_metadata,
         ai_model=ai_model,
-        curriculum_context=curriculum_context
+        curriculum_context=curriculum_context,
+        template_prompt=template_prompt
     )
 
     debug_log(note_id, f"Content generated: {len(organized_content)} chars")

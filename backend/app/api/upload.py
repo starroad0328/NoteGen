@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.note import Note, OrganizeMethod, ProcessStatus
 from app.models.user import User
+from app.models.organize_template import OrganizeTemplate
 from app.schemas.note import NoteResponse
 from app.api.auth import get_current_user
 
@@ -59,7 +60,7 @@ def save_upload_file(file: UploadFile) -> str:
 async def upload_images(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(..., description="이미지 파일 (최대 3개)"),
-    organize_method: OrganizeMethod = Form(default=OrganizeMethod.BASIC_SUMMARY),
+    organize_method: str = Form(default="basic_summary"),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
@@ -67,7 +68,7 @@ async def upload_images(
     필기 이미지 업로드 및 자동 처리 시작
 
     - **files**: 이미지 파일 리스트 (JPG, PNG)
-    - **organize_method**: 정리 방식 (basic_summary 또는 cornell)
+    - **organize_method**: 정리 방식 (basic_summary, cornell, template_1 등)
     - 로그인 시 사용자 학년에 맞는 교육과정 기반 보충 설명 제공
     """
 
@@ -105,11 +106,36 @@ async def upload_images(
                 os.remove(path)
         raise e
 
+    # 정리법 템플릿 처리
+    template_id = None
+    actual_organize_method = OrganizeMethod.BASIC_SUMMARY
+
+    if organize_method.startswith("template_"):
+        # 정리법샵 템플릿 사용
+        try:
+            template_id = int(organize_method.replace("template_", ""))
+            template = db.query(OrganizeTemplate).filter(OrganizeTemplate.id == template_id).first()
+            if template:
+                # 템플릿 사용 횟수 증가
+                template.increment_usage()
+                db.commit()
+            else:
+                template_id = None  # 템플릿 없으면 기본값 사용
+        except ValueError:
+            pass  # 파싱 실패시 기본값 사용
+    else:
+        # 기본 정리법 사용
+        try:
+            actual_organize_method = OrganizeMethod(organize_method)
+        except ValueError:
+            actual_organize_method = OrganizeMethod.BASIC_SUMMARY
+
     # 노트 생성 (로그인 사용자면 user_id 저장)
     note = Note(
         title=f"필기 {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         image_paths=",".join(saved_paths),  # 쉼표로 구분하여 저장
-        organize_method=organize_method,
+        organize_method=actual_organize_method,
+        template_id=template_id,
         status=ProcessStatus.UPLOADING,
         user_id=current_user.id if current_user else None
     )
