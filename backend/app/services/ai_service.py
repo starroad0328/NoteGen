@@ -536,7 +536,7 @@ class AIService:
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=6000,
+                max_completion_tokens=6000,
                 temperature=0.3
             )
 
