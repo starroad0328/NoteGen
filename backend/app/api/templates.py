@@ -79,6 +79,9 @@ async def list_subscribed_templates(
     current_user: User = Depends(get_current_user)
 ):
     """내가 구독한 정리법 목록"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
     subscriptions = db.query(UserTemplateSubscription).filter(
         UserTemplateSubscription.user_id == current_user.id
     ).all()
@@ -112,6 +115,9 @@ async def list_liked_templates(
     current_user: User = Depends(get_current_user)
 ):
     """내가 좋아요한 정리법 ID 목록"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
     likes = db.query(UserTemplateLike).filter(
         UserTemplateLike.user_id == current_user.id
     ).all()
@@ -171,6 +177,9 @@ async def subscribe_template(
     current_user: User = Depends(get_current_user)
 ):
     """정리법 구독"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
     template = db.query(OrganizeTemplate).filter(OrganizeTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="정리법을 찾을 수 없습니다.")
@@ -209,6 +218,9 @@ async def unsubscribe_template(
     current_user: User = Depends(get_current_user)
 ):
     """정리법 구독 해제"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
     subscription = db.query(UserTemplateSubscription).filter(
         UserTemplateSubscription.user_id == current_user.id,
         UserTemplateSubscription.template_id == template_id
@@ -230,6 +242,9 @@ async def like_template(
     current_user: User = Depends(get_current_user)
 ):
     """정리법 좋아요"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
     template = db.query(OrganizeTemplate).filter(OrganizeTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="정리법을 찾을 수 없습니다.")
@@ -262,6 +277,9 @@ async def unlike_template(
     current_user: User = Depends(get_current_user)
 ):
     """정리법 좋아요 취소"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
     template = db.query(OrganizeTemplate).filter(OrganizeTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="정리법을 찾을 수 없습니다.")
