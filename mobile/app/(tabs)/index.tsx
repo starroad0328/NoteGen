@@ -98,9 +98,15 @@ export default function HomeTab() {
               <Text style={[styles.gradeText, { color: colors.primary }]}>{user.grade_display}</Text>
             )}
           </View>
-          {usage && !usage.is_unlimited && (
-            <View style={[styles.usagePill, { backgroundColor: colors.primary }, usage.remaining <= 3 && { backgroundColor: colors.accent }]}>
-              <Text style={styles.usagePillText}>{usage.remaining}회 남음</Text>
+          {usage && (
+            <View style={[
+              styles.usagePill,
+              { backgroundColor: usage.is_unlimited ? '#8B5CF6' : colors.primary },
+              !usage.is_unlimited && usage.remaining <= 3 && { backgroundColor: colors.accent }
+            ]}>
+              <Text style={styles.usagePillText}>
+                {usage.is_unlimited ? '무제한' : `${usage.remaining}회 남음`}
+              </Text>
             </View>
           )}
         </View>
