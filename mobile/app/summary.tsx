@@ -13,8 +13,10 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { notesAPI, summaryAPI, Note, SummaryLimits } from '../services/api'
@@ -27,6 +29,7 @@ const SUMMARY_STYLES = [
 
 export default function SummaryScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { user, token } = useAuth()
   const { colors } = useTheme()
 
@@ -184,7 +187,14 @@ export default function SummaryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 헤더 */}
-      <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.tabBarBorder }]}>
+      <View style={[
+        styles.header,
+        {
+          backgroundColor: colors.cardBg,
+          borderBottomColor: colors.tabBarBorder,
+          paddingTop: insets.top + 12,
+        }
+      ]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={[styles.backText, { color: colors.primary }]}>← 뒤로</Text>
         </TouchableOpacity>
@@ -269,7 +279,14 @@ export default function SummaryScreen() {
       </View>
 
       {/* 생성 버튼 */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.cardBg, borderTopColor: colors.tabBarBorder }]}>
+      <View style={[
+        styles.bottomBar,
+        {
+          backgroundColor: colors.cardBg,
+          borderTopColor: colors.tabBarBorder,
+          paddingBottom: Math.max(insets.bottom, 16) + 16,
+        }
+      ]}>
         <TouchableOpacity
           style={[
             styles.generateButton,
@@ -305,8 +322,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
   },
   backText: {
@@ -377,7 +394,7 @@ const styles = StyleSheet.create({
   },
   notesList: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   noteItem: {
     flexDirection: 'row',
@@ -433,7 +450,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
-    paddingBottom: 32,
     borderTopWidth: 1,
   },
   generateButton: {
