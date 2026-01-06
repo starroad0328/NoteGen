@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     CLOVA_OCR_SECRET_KEY: Optional[str] = None
     CLOVA_OCR_INVOKE_URL: Optional[str] = None
 
+    # Cloudinary (Image Storage)
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
+
     # File Upload
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB

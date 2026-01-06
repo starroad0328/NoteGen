@@ -19,7 +19,7 @@ import {
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { notesAPI, Note } from '../../services/api'
+import { notesAPI, Note, API_BASE_URL } from '../../services/api'
 import { NoteRenderer, convertToNoteData, NoteData } from '../../components/note'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -53,7 +53,9 @@ export default function NoteScreen() {
     const items: PageItem[] = [{ type: 'note' }]
     if (note?.image_urls) {
       note.image_urls.forEach((url, index) => {
-        items.push({ type: 'image', imageUrl: url, imageIndex: index })
+        // 상대 경로를 전체 URL로 변환
+        const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`
+        items.push({ type: 'image', imageUrl: fullUrl, imageIndex: index })
       })
     }
     return items
@@ -112,6 +114,8 @@ export default function NoteScreen() {
   const fetchNote = async () => {
     try {
       const data = await notesAPI.get(noteId)
+      console.log('[NoteScreen] 노트 데이터:', JSON.stringify(data, null, 2))
+      console.log('[NoteScreen] image_urls:', data.image_urls)
       setNote(data)
     } catch (error) {
       console.error('노트 조회 오류:', error)

@@ -18,6 +18,18 @@ from app.models.organize_template import OrganizeTemplate
 from app.schemas.note import NoteResponse
 from app.api.auth import get_current_user
 
+# Cloudinary 설정
+import cloudinary
+import cloudinary.uploader
+
+if settings.CLOUDINARY_CLOUD_NAME:
+    cloudinary.config(
+        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+        api_key=settings.CLOUDINARY_API_KEY,
+        api_secret=settings.CLOUDINARY_API_SECRET,
+        secure=True
+    )
+
 router = APIRouter()
 
 
@@ -34,23 +46,41 @@ def validate_file(file: UploadFile) -> bool:
 
 
 def save_upload_file(file: UploadFile) -> str:
-    """업로드 파일 저장"""
-    # 고유 파일명 생성
+    """업로드 파일 저장 (Cloudinary 또는 로컬)"""
+    content = file.file.read()
+
+    # 파일 크기 확인
+    if len(content) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"파일 크기가 너무 큽니다. 최대: {settings.MAX_UPLOAD_SIZE / (1024*1024)}MB"
+        )
+
+    # Cloudinary가 설정되어 있으면 클라우드에 업로드
+    if settings.CLOUDINARY_CLOUD_NAME:
+        try:
+            # 파일 포인터를 처음으로 되돌리기
+            file.file.seek(0)
+
+            # Cloudinary에 업로드
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="notegen",  # Cloudinary 폴더
+                resource_type="image"
+            )
+
+            # Cloudinary URL 반환 (secure_url은 https)
+            return result["secure_url"]
+        except Exception as e:
+            print(f"[Cloudinary] 업로드 실패: {e}")
+            raise HTTPException(status_code=500, detail=f"이미지 업로드 실패: {str(e)}")
+
+    # Cloudinary 미설정 시 로컬 저장 (개발 환경)
     file_ext = file.filename.split('.')[-1].lower()
     unique_filename = f"{uuid.uuid4()}.{file_ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
 
-    # 파일 저장
     with open(file_path, "wb") as buffer:
-        content = file.file.read()
-
-        # 파일 크기 확인
-        if len(content) > settings.MAX_UPLOAD_SIZE:
-            raise HTTPException(
-                status_code=400,
-                detail=f"파일 크기가 너무 큽니다. 최대: {settings.MAX_UPLOAD_SIZE / (1024*1024)}MB"
-            )
-
         buffer.write(content)
 
     return file_path

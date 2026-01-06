@@ -22,7 +22,10 @@ def get_thumbnail_url(image_paths: str) -> str | None:
     """이미지 경로에서 첫 번째 이미지의 URL 생성"""
     if not image_paths:
         return None
-    first_path = image_paths.split(",")[0]
+    first_path = image_paths.split(",")[0].strip()
+    # Cloudinary URL은 그대로 반환
+    if first_path.startswith("http://") or first_path.startswith("https://"):
+        return first_path
     # "./uploads/uuid.jpg" -> "/uploads/uuid.jpg"
     if first_path.startswith("./"):
         return first_path[1:]  # "." 제거
@@ -38,7 +41,10 @@ def get_image_urls(image_paths: str) -> List[str]:
     urls = []
     for path in image_paths.split(","):
         path = path.strip()
-        if path.startswith("./"):
+        # Cloudinary URL은 그대로 반환
+        if path.startswith("http://") or path.startswith("https://"):
+            urls.append(path)
+        elif path.startswith("./"):
             urls.append(path[1:])  # "." 제거
         elif path.startswith("uploads/"):
             urls.append("/" + path)
