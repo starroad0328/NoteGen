@@ -64,6 +64,9 @@ class User(Base):
     monthly_usage = Column(Integer, default=0)  # 이번 달 사용 횟수
     usage_reset_date = Column(Date, default=date.today)  # 마지막 리셋 날짜
 
+    # 요약 노트 사용량
+    monthly_summary_usage = Column(Integer, default=0)  # 이번 달 요약 생성 횟수
+
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', plan='{self.plan}')>"
 
@@ -111,6 +114,7 @@ class User(Base):
         today = date.today()
         if self.usage_reset_date is None or self.usage_reset_date.month != today.month or self.usage_reset_date.year != today.year:
             self.monthly_usage = 0
+            self.monthly_summary_usage = 0  # 요약 사용량도 리셋
             self.usage_reset_date = today
 
     def can_use_service(self) -> bool:
@@ -135,4 +139,49 @@ class User(Base):
             "limit": limit,
             "remaining": max(0, limit - self.monthly_usage) if limit != -1 else -1,
             "is_unlimited": limit == -1,
+        }
+
+    # ===== 요약 노트 관련 메서드 =====
+
+    def get_summary_monthly_limit(self) -> int:
+        """플랜별 월간 요약 생성 제한"""
+        limits = {
+            UserPlan.FREE: 1,     # 무료: 월 1회
+            UserPlan.BASIC: 5,    # 베이직: 월 5회
+            UserPlan.PRO: -1,     # 프로: 무제한
+        }
+        return limits.get(self.plan, 1)
+
+    def get_summary_max_notes(self) -> int:
+        """플랜별 요약에 선택 가능한 최대 필기 수"""
+        limits = {
+            UserPlan.FREE: 3,     # 무료: 최대 3개
+            UserPlan.BASIC: 5,    # 베이직: 최대 5개
+            UserPlan.PRO: 10,     # 프로: 최대 10개
+        }
+        return limits.get(self.plan, 3)
+
+    def can_generate_summary(self) -> bool:
+        """요약 생성 가능 여부"""
+        self.check_and_reset_usage()
+        limit = self.get_summary_monthly_limit()
+        if limit == -1:  # 무제한
+            return True
+        return self.monthly_summary_usage < limit
+
+    def increment_summary_usage(self) -> None:
+        """요약 사용량 증가"""
+        self.check_and_reset_usage()
+        self.monthly_summary_usage += 1
+
+    def get_summary_usage_info(self) -> dict:
+        """요약 사용량 정보 반환"""
+        self.check_and_reset_usage()
+        limit = self.get_summary_monthly_limit()
+        return {
+            "used": self.monthly_summary_usage,
+            "limit": limit,
+            "remaining": max(0, limit - self.monthly_summary_usage) if limit != -1 else -1,
+            "is_unlimited": limit == -1,
+            "max_notes": self.get_summary_max_notes(),
         }

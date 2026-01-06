@@ -20,7 +20,7 @@ export default function NotesTab() {
   const { user, token, loading: authLoading } = useAuth()
   const { colors } = useTheme()
   const [notes, setNotes] = useState<Note[]>([])
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)  // 최초 로딩
   const [refreshing, setRefreshing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [editModalVisible, setEditModalVisible] = useState(false)
@@ -56,14 +56,14 @@ export default function NotesTab() {
     } catch (error) {
       console.error('노트 목록 조회 오류:', error)
     } finally {
-      setLoading(false)
+      setInitialLoading(false)
       setRefreshing(false)
     }
   }
 
   const handleSubjectChange = (subject: string) => {
     setSelectedSubject(subject)
-    setLoading(true)
+    // 필터 변경 시 바로 fetchNotes 호출 (loading 상태 없이)
   }
 
   const handleSearch = (text: string) => {
@@ -73,7 +73,7 @@ export default function NotesTab() {
       clearTimeout(searchTimeout)
     }
     const timeout = setTimeout(() => {
-      setLoading(true)
+      // 검색어 변경 시 fetchNotes가 useFocusEffect에서 자동 호출됨
     }, 300)
     setSearchTimeout(timeout)
   }
@@ -228,7 +228,7 @@ export default function NotesTab() {
     )
   }
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emoji}>📚</Text>
@@ -242,8 +242,16 @@ export default function NotesTab() {
       {/* 헤더 */}
       <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.tabBarBorder }]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>보관함</Text>
-          <Text style={[styles.headerCount, { color: colors.textLight }]}>{notes.length}개의 노트</Text>
+          <View>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>보관함</Text>
+            <Text style={[styles.headerCount, { color: colors.textLight }]}>{notes.length}개의 노트</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.summaryButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push('/summary')}
+          >
+            <Text style={styles.summaryButtonText}>📝 요약 생성</Text>
+          </TouchableOpacity>
         </View>
         {/* 검색 바 */}
         <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
@@ -363,7 +371,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  summaryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  summaryButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 28,

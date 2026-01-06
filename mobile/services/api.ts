@@ -562,4 +562,51 @@ export const templatesAPI = {
   },
 }
 
+/**
+ * 요약 노트 API
+ */
+export interface SummaryLimits {
+  used: number
+  limit: number
+  remaining: number
+  is_unlimited: boolean
+  max_notes: number
+  available_styles: string[]
+}
+
+export interface SummaryResponse {
+  id: number
+  title: string
+  content: string
+  source_note_ids: number[]
+  style: string
+}
+
+export const summaryAPI = {
+  // 요약 생성 제한 조회
+  getLimits: async (token: string): Promise<SummaryLimits> => {
+    const response = await apiClient.get('/api/summary/limits', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 요약 노트 생성
+  generate: async (
+    token: string,
+    noteIds: number[],
+    style: string = 'basic',
+    title?: string
+  ): Promise<SummaryResponse> => {
+    const response = await apiClient.post('/api/summary/generate', {
+      note_ids: noteIds,
+      style,
+      title
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+}
+
 export default apiClient

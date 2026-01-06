@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.database import init_db, get_db_session
 from app.core.seed_curriculum import seed_curriculum
 from app.core.seed_templates import seed_templates
-from app.api import upload, process, notes, auth, curriculum, payment, weak_concepts, templates
+from app.api import upload, process, notes, auth, curriculum, payment, weak_concepts, templates, summary
 
 # 데이터베이스 초기화
 init_db()
@@ -105,6 +105,12 @@ app.include_router(
     tags=["Templates"]
 )
 
+app.include_router(
+    summary.router,
+    prefix="/api/summary",
+    tags=["Summary"]
+)
+
 # 업로드된 이미지 정적 파일 서빙
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
@@ -138,6 +144,14 @@ async def startup_event():
             db.execute(text("ALTER TABLE notes ADD COLUMN template_id INTEGER REFERENCES organize_templates(id)"))
             db.commit()
             print("[MIGRATION] Added template_id column to notes table")
+        except Exception:
+            db.rollback()  # 이미 존재하면 무시
+
+        # monthly_summary_usage 컬럼 추가 (없으면)
+        try:
+            db.execute(text("ALTER TABLE users ADD COLUMN monthly_summary_usage INTEGER DEFAULT 0"))
+            db.commit()
+            print("[MIGRATION] Added monthly_summary_usage column to users table")
         except Exception:
             db.rollback()  # 이미 존재하면 무시
 

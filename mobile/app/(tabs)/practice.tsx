@@ -32,6 +32,7 @@ export default function ProTab() {
   const [refreshing, setRefreshing] = useState(false)
   const [selectedConcept, setSelectedConcept] = useState<WeakConcept | null>(null)
   const [showAllWeakConcepts, setShowAllWeakConcepts] = useState(false)
+  const [showAllConceptCards, setShowAllConceptCards] = useState(false)
 
   const fetchData = async () => {
     if (!token) {
@@ -326,32 +327,53 @@ export default function ProTab() {
 
         {/* 개념 카드 섹션 */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>내 개념 카드</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>내 개념 카드</Text>
+            {conceptCards.length > 0 && (
+              <Text style={[styles.countBadge, { color: colors.textLight }]}>
+                {conceptCards.length}개
+              </Text>
+            )}
+          </View>
           <Text style={[styles.sectionDesc, { color: colors.textLight }]}>
             정리한 노트에서 추출된 핵심 개념
           </Text>
 
           {conceptCards.length > 0 ? (
-            conceptCards.slice(0, 5).map((card) => (
-              <View key={card.id} style={[styles.conceptCard, { backgroundColor: colors.cardBg }]}>
-                <View style={styles.conceptHeader}>
-                  <View style={[styles.conceptTypeBadge, { backgroundColor: colors.primary + '20' }]}>
-                    <Text style={[styles.conceptTypeText, { color: colors.primary }]}>
-                      {card.card_type}
+            <>
+              {conceptCards.slice(0, showAllConceptCards ? undefined : 3).map((card) => (
+                <View key={card.id} style={[styles.conceptCard, { backgroundColor: colors.cardBg }]}>
+                  <View style={styles.conceptHeader}>
+                    <View style={[styles.conceptTypeBadge, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.conceptTypeText, { color: colors.primary }]}>
+                        {card.card_type}
+                      </Text>
+                    </View>
+                    <Text style={[styles.conceptSubject, { color: colors.textLight }]}>
+                      {SUBJECT_NAMES[card.subject || 'other']}
                     </Text>
                   </View>
-                  <Text style={[styles.conceptSubject, { color: colors.textLight }]}>
-                    {SUBJECT_NAMES[card.subject || 'other']}
-                  </Text>
+                  <Text style={[styles.conceptTitle, { color: colors.text }]}>{card.title}</Text>
+                  {card.unit_name && (
+                    <Text style={[styles.conceptUnit, { color: colors.textLight }]}>
+                      {card.unit_name}
+                    </Text>
+                  )}
                 </View>
-                <Text style={[styles.conceptTitle, { color: colors.text }]}>{card.title}</Text>
-                {card.unit_name && (
-                  <Text style={[styles.conceptUnit, { color: colors.textLight }]}>
-                    {card.unit_name}
+              ))}
+
+              {/* 전체보기 버튼 */}
+              {conceptCards.length > 3 && (
+                <TouchableOpacity
+                  style={[styles.viewAllButton, { borderColor: colors.primary }]}
+                  onPress={() => setShowAllConceptCards(!showAllConceptCards)}
+                >
+                  <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                    {showAllConceptCards ? '접기' : `전체보기 (${conceptCards.length}개)`}
                   </Text>
-                )}
-              </View>
-            ))
+                </TouchableOpacity>
+              )}
+            </>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.cardBg }]}>
               <Text style={styles.emptyEmoji}>📝</Text>

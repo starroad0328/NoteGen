@@ -943,6 +943,119 @@ JSON:"""
             print(f"[AI] Concept Card 추출 실패: {e}", flush=True)
             return []
 
+    async def generate_summary(
+        self,
+        note_contents: List[Dict],
+        style: str = "basic",
+        user_plan: Optional['UserPlan'] = None,
+        school_level: Optional['SchoolLevel'] = None,
+        grade: Optional[int] = None
+    ) -> Dict:
+        """
+        여러 노트를 기반으로 시험용 요약 노트 생성
+
+        Args:
+            note_contents: [{"title": "제목", "content": "내용", "subject": "과목"}]
+            style: "basic" | "keyword" | "table"
+            user_plan: 사용자 플랜
+            school_level: 학교급
+            grade: 학년
+
+        Returns:
+            {"content": "요약 내용", "title_suggestion": "추천 제목"}
+        """
+        from app.models.user import UserPlan
+
+        print(f"[AI] 요약 생성 시작 - 노트 {len(note_contents)}개, 스타일: {style}", flush=True)
+
+        # 노트 내용 병합
+        combined_content = ""
+        for i, note in enumerate(note_contents, 1):
+            combined_content += f"\n\n=== [{i}] {note['title']} ===\n{note['content']}"
+
+        # 스타일별 프롬프트 지시사항
+        style_instructions = {
+            "basic": """
+## 기본 요약 형식
+- 핵심 개념을 중심으로 정리
+- 중요 공식/정의는 강조
+- 시험에 자주 나오는 포인트 표시
+- 마크다운 형식으로 깔끔하게 구성
+""",
+            "keyword": """
+## 키워드 중심 요약 형식
+- 각 개념을 **핵심 키워드** 중심으로 정리
+- 키워드별로 간단한 설명 추가
+- 연관 키워드끼리 그룹핑
+- 암기하기 좋은 구조로 구성
+- 예: **키워드**: 설명 (관련 개념)
+""",
+            "table": """
+## 표 형식 요약
+- 개념들을 표(테이블)로 정리
+- 비교 가능한 항목은 비교표로
+- 공식은 공식표로
+- 마크다운 테이블 문법 사용
+- 한눈에 보기 좋게 구성
+"""
+        }
+
+        # 학년 정보 추가
+        grade_context = ""
+        if school_level and grade:
+            level_str = "중학교" if school_level.value == "middle" else "고등학교"
+            grade_context = f"\n학습자: {level_str} {grade}학년 수준에 맞게 설명해주세요."
+
+        system_prompt = f"""당신은 시험 대비 요약 노트를 만드는 전문가입니다.
+
+여러 필기 노트를 분석하여 시험에 바로 활용할 수 있는 요약 노트를 생성합니다.
+
+{style_instructions.get(style, style_instructions["basic"])}
+{grade_context}
+
+## 규칙
+1. 시험에 나올 만한 핵심 내용만 추출
+2. 중복되는 내용은 통합
+3. 이해하기 쉽게 구조화
+4. 암기 팁이 있으면 추가
+5. 마크다운 형식으로 출력
+"""
+
+        user_prompt = f"""다음 필기 노트들을 시험용 요약 노트로 만들어주세요.
+
+{combined_content}
+
+---
+위 내용을 {style} 스타일로 요약해주세요. 시험에 바로 쓸 수 있게 핵심만 정리해주세요."""
+
+        # PRO 플랜은 GPT-5.2, 나머지는 GPT-5-mini
+        if user_plan == UserPlan.PRO:
+            model = "gpt-5.2"
+        else:
+            model = "gpt-5-mini-2025-08-07"
+
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_completion_tokens=8000
+            )
+
+            summary_content = response.choices[0].message.content
+            print(f"[AI] 요약 생성 완료 - {len(summary_content)} 글자", flush=True)
+
+            return {
+                "content": summary_content,
+                "model_used": model
+            }
+
+        except Exception as e:
+            print(f"[AI] 요약 생성 실패: {e}", flush=True)
+            raise e
+
 
 # 싱글톤 인스턴스
 ai_service = AIService()
