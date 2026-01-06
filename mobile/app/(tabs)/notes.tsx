@@ -27,12 +27,17 @@ export default function NotesTab() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
 
   const SUBJECT_FILTERS = [
     { key: 'all', label: '전체' },
     { key: 'math', label: '수학' },
     { key: 'korean', label: '국어' },
     { key: 'english', label: '영어' },
+    { key: 'social', label: '사회' },
+    { key: 'science', label: '과학' },
+    { key: 'history', label: '역사' },
   ]
 
   // 탭 포커스 시 새로고침 (삭제 중이 아닐 때만)
@@ -41,12 +46,12 @@ export default function NotesTab() {
       if (user && !isDeleting) {
         fetchNotes()
       }
-    }, [user, isDeleting, selectedSubject])
+    }, [user, isDeleting, selectedSubject, searchQuery])
   )
 
   const fetchNotes = async () => {
     try {
-      const data = await notesAPI.list(0, 20, token, selectedSubject)
+      const data = await notesAPI.list(0, 50, token, selectedSubject, searchQuery)
       setNotes(data)
     } catch (error) {
       console.error('노트 목록 조회 오류:', error)
@@ -59,6 +64,18 @@ export default function NotesTab() {
   const handleSubjectChange = (subject: string) => {
     setSelectedSubject(subject)
     setLoading(true)
+  }
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text)
+    // 디바운스: 타이핑 중 연속 요청 방지
+    if (searchTimeout) {
+      clearTimeout(searchTimeout)
+    }
+    const timeout = setTimeout(() => {
+      setLoading(true)
+    }, 300)
+    setSearchTimeout(timeout)
   }
 
   const onRefresh = () => {
@@ -140,7 +157,10 @@ export default function NotesTab() {
   }
 
   const renderNoteItem = ({ item, index }: { item: Note; index: number }) => {
-    const thumbnailUrl = item.thumbnail_url ? `${API_BASE_URL}${item.thumbnail_url}` : null
+    // Cloudinary URL은 그대로, 로컬 경로는 API_BASE_URL 붙이기
+    const thumbnailUrl = item.thumbnail_url
+      ? (item.thumbnail_url.startsWith('http') ? item.thumbnail_url : `${API_BASE_URL}${item.thumbnail_url}`)
+      : null
 
     return (
       <TouchableOpacity
@@ -221,8 +241,27 @@ export default function NotesTab() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 헤더 */}
       <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.tabBarBorder }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>보관함</Text>
-        <Text style={[styles.headerCount, { color: colors.textLight }]}>{notes.length}개의 노트</Text>
+        <View style={styles.headerTop}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>보관함</Text>
+          <Text style={[styles.headerCount, { color: colors.textLight }]}>{notes.length}개의 노트</Text>
+        </View>
+        {/* 검색 바 */}
+        <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="노트 검색..."
+            placeholderTextColor={colors.textLight}
+            value={searchQuery}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')}>
+              <Text style={[styles.clearButton, { color: colors.textLight }]}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* 과목 필터 탭 */}
@@ -319,9 +358,12 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   header: {
-    padding: 20,
+    padding: 16,
     paddingTop: 60,
     borderBottomWidth: 1,
+  },
+  headerTop: {
+    marginBottom: 12,
   },
   headerTitle: {
     fontSize: 28,
@@ -330,6 +372,26 @@ const styles = StyleSheet.create({
   headerCount: {
     fontSize: 14,
     marginTop: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
+  clearButton: {
+    fontSize: 16,
+    padding: 4,
   },
   filterContainer: {
     paddingVertical: 12,

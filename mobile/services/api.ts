@@ -202,7 +202,7 @@ export const processAPI = {
  * 노트 관리 API
  */
 export const notesAPI = {
-  list: async (skip: number = 0, limit: number = 20, token?: string | null, subject?: string): Promise<Note[]> => {
+  list: async (skip: number = 0, limit: number = 20, token?: string | null, subject?: string, search?: string): Promise<Note[]> => {
     const headers: Record<string, string> = {}
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
@@ -210,6 +210,9 @@ export const notesAPI = {
     const params: Record<string, any> = { skip, limit }
     if (subject && subject !== 'all') {
       params.subject = subject
+    }
+    if (search && search.trim()) {
+      params.search = search.trim()
     }
     const response = await apiClient.get('/api/notes/', {
       params,

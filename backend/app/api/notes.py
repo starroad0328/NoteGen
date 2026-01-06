@@ -58,6 +58,7 @@ async def list_notes(
     skip: int = 0,
     limit: int = 20,
     subject: Optional[str] = None,
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
@@ -66,7 +67,8 @@ async def list_notes(
 
     - **skip**: 건너뛸 노트 수
     - **limit**: 가져올 노트 수 (최대 100)
-    - **subject**: 과목 필터 (math, korean, english, 또는 all)
+    - **subject**: 과목 필터 (math, korean, english, social, science, history 또는 all)
+    - **search**: 제목 검색어
     """
     if limit > 100:
         limit = 100
@@ -86,6 +88,10 @@ async def list_notes(
             query = query.filter(Note.detected_subject == subject_enum)
         except ValueError:
             pass  # 잘못된 과목명은 무시
+
+    # 제목 검색 적용
+    if search and search.strip():
+        query = query.filter(Note.title.ilike(f"%{search.strip()}%"))
 
     notes = query.order_by(Note.created_at.desc())\
         .offset(skip)\
