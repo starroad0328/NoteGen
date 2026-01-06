@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Clipboard from 'expo-clipboard'
 import { notesAPI, Note, API_BASE_URL } from '../../services/api'
 import { NoteRenderer, convertToNoteData, NoteData } from '../../components/note'
@@ -35,6 +36,7 @@ interface PageItem {
 
 export default function NoteScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams()
   const noteId = parseInt(id as string)
   const { colors } = useTheme()
@@ -310,7 +312,14 @@ export default function NoteScreen() {
       />
 
       {/* 노트 정보 */}
-      <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.tabBarBorder }]}>
+      <View style={[
+        styles.footer,
+        {
+          backgroundColor: colors.background,
+          borderTopColor: colors.tabBarBorder,
+          paddingBottom: Math.max(insets.bottom, 12) + 8,
+        }
+      ]}>
         <Text style={[styles.footerText, { color: colors.textLight }]}>
           {new Date(note.created_at).toLocaleString('ko-KR')}
         </Text>
@@ -502,7 +511,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   footer: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
     borderTopWidth: 1,
