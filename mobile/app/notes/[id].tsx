@@ -1,6 +1,6 @@
 /**
  * 노트 상세 화면
- * 통합 단일 컬럼 UI - 모든 정리 방식에서 동일한 레이아웃 사용
+ * 스와이프로 정리 내용 ↔ 원본 사진 전환
  */
 
 import { useEffect, useState, useRef, useMemo } from 'react'
@@ -12,7 +12,10 @@ import {
   TouchableOpacity,
   Alert,
   Animated,
-  Dimensions
+  Dimensions,
+  FlatList,
+  Image,
+  ActivityIndicator,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
@@ -20,8 +23,15 @@ import { notesAPI, Note } from '../../services/api'
 import { NoteRenderer, convertToNoteData, NoteData } from '../../components/note'
 import { useTheme } from '../../contexts/ThemeContext'
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
+
+type PageType = 'note' | 'image'
+interface PageItem {
+  type: PageType
+  imageUrl?: string
+  imageIndex?: number
+}
 
 export default function NoteScreen() {
   const router = useRouter()
@@ -32,9 +42,22 @@ export default function NoteScreen() {
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
 
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current
   const contentScrollRef = useRef<ScrollView>(null)
+  const horizontalScrollRef = useRef<FlatList>(null)
+
+  // 페이지 데이터: [노트, 이미지1, 이미지2, ...]
+  const pages = useMemo((): PageItem[] => {
+    const items: PageItem[] = [{ type: 'note' }]
+    if (note?.image_urls) {
+      note.image_urls.forEach((url, index) => {
+        items.push({ type: 'image', imageUrl: url, imageIndex: index })
+      })
+    }
+    return items
+  }, [note])
 
   // 노트 데이터를 통합 형식으로 변환
   const noteData = useMemo((): NoteData | null => {
@@ -127,6 +150,77 @@ export default function NoteScreen() {
     )
   }
 
+  const handleScroll = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x
+    const page = Math.round(offsetX / SCREEN_WIDTH)
+    if (page !== currentPage) {
+      setCurrentPage(page)
+    }
+  }
+
+  const renderPage = ({ item, index }: { item: PageItem; index: number }) => {
+    if (item.type === 'note') {
+      return (
+        <View style={styles.pageContainer}>
+          {/* 정리 방식 태그 */}
+          <View style={[styles.tagBar, { backgroundColor: colors.background, borderBottomColor: colors.tabBarBorder }]}>
+            <View style={[styles.tag, { backgroundColor: colors.primary }]}>
+              <Text style={styles.tagText}>
+                {getMethodLabel(note?.organize_method)}
+              </Text>
+            </View>
+            {note?.detected_subject && (
+              <View style={[styles.tag, styles.subjectTag, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.tagText, { color: colors.text }]}>{note.detected_subject}</Text>
+              </View>
+            )}
+            {note?.image_urls && note.image_urls.length > 0 && (
+              <Text style={[styles.swipeHint, { color: colors.textLight }]}>
+                스와이프하여 원본 사진 보기
+              </Text>
+            )}
+          </View>
+
+          {/* 통합 노트 렌더러 */}
+          {noteData && (
+            <NoteRenderer
+              data={noteData}
+              scrollRef={contentScrollRef}
+              colors={colors}
+            />
+          )}
+        </View>
+      )
+    } else {
+      // 이미지 페이지
+      return (
+        <View style={[styles.pageContainer, styles.imagePageContainer, { backgroundColor: colors.background }]}>
+          <View style={styles.imageHeader}>
+            <Text style={[styles.imageTitle, { color: colors.text }]}>
+              원본 사진 {(item.imageIndex || 0) + 1} / {note?.image_urls?.length || 0}
+            </Text>
+            <Text style={[styles.swipeHintRight, { color: colors.textLight }]}>
+              스와이프하여 돌아가기 →
+            </Text>
+          </View>
+          <ScrollView
+            style={styles.imageScrollView}
+            contentContainerStyle={styles.imageScrollContent}
+            maximumZoomScale={3}
+            minimumZoomScale={1}
+            showsVerticalScrollIndicator={false}
+          >
+            <Image
+              source={{ uri: item.imageUrl }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          </ScrollView>
+        </View>
+      )
+    }
+  }
+
   if (loading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
@@ -171,28 +265,45 @@ export default function NoteScreen() {
         </View>
       </View>
 
-      {/* 정리 방식 태그 */}
-      <View style={[styles.tagBar, { backgroundColor: colors.background, borderBottomColor: colors.tabBarBorder }]}>
-        <View style={[styles.tag, { backgroundColor: colors.primary }]}>
-          <Text style={styles.tagText}>
-            {getMethodLabel(note.organize_method)}
-          </Text>
+      {/* 페이지 인디케이터 */}
+      {pages.length > 1 && (
+        <View style={[styles.pageIndicator, { backgroundColor: colors.cardBg }]}>
+          {pages.map((_, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => {
+                horizontalScrollRef.current?.scrollToIndex({ index, animated: true })
+                setCurrentPage(index)
+              }}
+            >
+              <View
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor: index === currentPage
+                      ? colors.primary
+                      : colors.tabBarBorder,
+                  },
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
         </View>
-        {note.detected_subject && (
-          <View style={[styles.tag, styles.subjectTag, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.tagText, { color: colors.text }]}>{note.detected_subject}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* 통합 노트 렌더러 */}
-      {noteData && (
-        <NoteRenderer
-          data={noteData}
-          scrollRef={contentScrollRef}
-          colors={colors}
-        />
       )}
+
+      {/* 가로 스와이프 컨테이너 */}
+      <FlatList
+        ref={horizontalScrollRef}
+        data={pages}
+        renderItem={renderPage}
+        keyExtractor={(_, index) => `page-${index}`}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        style={styles.horizontalScroll}
+      />
 
       {/* 노트 정보 */}
       <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.tabBarBorder }]}>
@@ -305,8 +416,32 @@ const styles = StyleSheet.create({
   buttonIcon: {
     fontSize: 18,
   },
+  pageIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  horizontalScroll: {
+    flex: 1,
+  },
+  pageContainer: {
+    width: SCREEN_WIDTH,
+    flex: 1,
+  },
+  imagePageContainer: {
+    justifyContent: 'flex-start',
+  },
   tagBar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
@@ -327,6 +462,40 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  swipeHint: {
+    fontSize: 11,
+    marginLeft: 'auto',
+  },
+  swipeHintRight: {
+    fontSize: 12,
+  },
+  imageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  imageTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  imageScrollView: {
+    flex: 1,
+  },
+  imageScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  fullImage: {
+    width: SCREEN_WIDTH - 32,
+    height: SCREEN_HEIGHT - 250,
+    borderRadius: 8,
   },
   footer: {
     padding: 12,

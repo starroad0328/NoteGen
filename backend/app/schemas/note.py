@@ -32,6 +32,7 @@ class NoteResponse(BaseModel):
     organized_content: Optional[str] = None
     error_message: Optional[str] = None
     image_urls: Optional[List[str]] = None  # 원본 이미지 URL 목록
+    detected_subject: Optional[str] = None  # AI 감지 과목
 
     class Config:
         from_attributes = True

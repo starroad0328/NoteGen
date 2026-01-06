@@ -151,6 +151,7 @@ async def get_note(
         "organized_content": note.organized_content,
         "error_message": note.error_message,
         "image_urls": get_image_urls(note.image_paths),
+        "detected_subject": note.detected_subject.value if note.detected_subject else None,
     }
 
 

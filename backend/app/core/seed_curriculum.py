@@ -13,6 +13,13 @@ from app.models.curriculum import (
     ENGLISH_DOMAINS_2015_MIDDLE, ENGLISH_STANDARDS_2015_MIDDLE,
     SOCIAL_DOMAINS_2015_MIDDLE, SOCIAL_STANDARDS_2015_MIDDLE,
     SCIENCE_DOMAINS_2015_MIDDLE, SCIENCE_STANDARDS_2015_MIDDLE,
+    # 고등학교 교육과정
+    MATH_DOMAINS_2015_HIGH, MATH_STANDARDS_2015_HIGH,
+    KOREAN_DOMAINS_2015_HIGH, KOREAN_STANDARDS_2015_HIGH,
+    ENGLISH_DOMAINS_2015_HIGH, ENGLISH_STANDARDS_2015_HIGH,
+    SOCIAL_DOMAINS_2015_HIGH, SOCIAL_STANDARDS_2015_HIGH,
+    SCIENCE_DOMAINS_2015_HIGH, SCIENCE_STANDARDS_2015_HIGH,
+    HISTORY_DOMAINS_2015_HIGH, HISTORY_STANDARDS_2015_HIGH,
 )
 from app.models.user import SchoolLevel
 
@@ -199,6 +206,52 @@ def seed_curriculum(db: Session):
         print(f"[SEED] Science domains: {len(science_domains)} loaded")
         science_std_count = seed_standards(db, science_domains, SCIENCE_STANDARDS_2015_MIDDLE)
         print(f"[SEED] Science standards: {science_std_count} added")
+
+    # ========== 고등학교 교육과정 (2015 개정) ==========
+    print("[SEED] Starting high school curriculum seed...")
+
+    # 7. 고등학교 수학 영역 및 성취기준 삽입
+    if math_subject:
+        math_domains_high = seed_domains(db, math_subject, MATH_DOMAINS_2015_HIGH, SchoolLevel.HIGH)
+        print(f"[SEED] Math (HIGH) domains: {len(math_domains_high)} loaded")
+        math_std_high_count = seed_standards(db, math_domains_high, MATH_STANDARDS_2015_HIGH)
+        print(f"[SEED] Math (HIGH) standards: {math_std_high_count} added")
+
+    # 8. 고등학교 국어 영역 및 성취기준 삽입
+    if korean_subject:
+        korean_domains_high = seed_domains(db, korean_subject, KOREAN_DOMAINS_2015_HIGH, SchoolLevel.HIGH)
+        print(f"[SEED] Korean (HIGH) domains: {len(korean_domains_high)} loaded")
+        korean_std_high_count = seed_standards(db, korean_domains_high, KOREAN_STANDARDS_2015_HIGH)
+        print(f"[SEED] Korean (HIGH) standards: {korean_std_high_count} added")
+
+    # 9. 고등학교 영어 영역 및 성취기준 삽입
+    if english_subject:
+        english_domains_high = seed_domains(db, english_subject, ENGLISH_DOMAINS_2015_HIGH, SchoolLevel.HIGH)
+        print(f"[SEED] English (HIGH) domains: {len(english_domains_high)} loaded")
+        english_std_high_count = seed_standards(db, english_domains_high, ENGLISH_STANDARDS_2015_HIGH)
+        print(f"[SEED] English (HIGH) standards: {english_std_high_count} added")
+
+    # 10. 고등학교 사회(통합사회) 영역 및 성취기준 삽입
+    if social_subject:
+        social_domains_high = seed_domains(db, social_subject, SOCIAL_DOMAINS_2015_HIGH, SchoolLevel.HIGH)
+        print(f"[SEED] Social (HIGH) domains: {len(social_domains_high)} loaded")
+        social_std_high_count = seed_standards(db, social_domains_high, SOCIAL_STANDARDS_2015_HIGH)
+        print(f"[SEED] Social (HIGH) standards: {social_std_high_count} added")
+
+    # 11. 고등학교 과학(통합과학) 영역 및 성취기준 삽입
+    if science_subject:
+        science_domains_high = seed_domains(db, science_subject, SCIENCE_DOMAINS_2015_HIGH, SchoolLevel.HIGH)
+        print(f"[SEED] Science (HIGH) domains: {len(science_domains_high)} loaded")
+        science_std_high_count = seed_standards(db, science_domains_high, SCIENCE_STANDARDS_2015_HIGH)
+        print(f"[SEED] Science (HIGH) standards: {science_std_high_count} added")
+
+    # 12. 고등학교 역사(한국사) 영역 및 성취기준 삽입
+    history_subject = subjects.get("history")
+    if history_subject:
+        history_domains_high = seed_domains(db, history_subject, HISTORY_DOMAINS_2015_HIGH, SchoolLevel.HIGH)
+        print(f"[SEED] History (HIGH) domains: {len(history_domains_high)} loaded")
+        history_std_high_count = seed_standards(db, history_domains_high, HISTORY_STANDARDS_2015_HIGH)
+        print(f"[SEED] History (HIGH) standards: {history_std_high_count} added")
 
     db.commit()
     print("[SEED] Curriculum seed complete!")
