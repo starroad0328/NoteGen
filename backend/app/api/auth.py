@@ -259,3 +259,38 @@ async def get_plans(
         usage=UsageResponse(**usage_info),
         plans=plans
     )
+
+
+@router.post("/admin/set-plan")
+async def admin_set_plan(
+    email: str,
+    plan: str,
+    admin_key: str,
+    db: Session = Depends(get_db)
+):
+    """관리자: 사용자 플랜 변경"""
+    # 간단한 관리자 키 검증
+    if admin_key != "notegen-admin-2026":
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    from app.models.user import UserPlan
+
+    # 사용자 찾기
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 플랜 변경
+    plan_map = {
+        "free": UserPlan.FREE,
+        "basic": UserPlan.BASIC,
+        "pro": UserPlan.PRO,
+    }
+
+    if plan not in plan_map:
+        raise HTTPException(status_code=400, detail="Invalid plan. Use: free, basic, pro")
+
+    user.plan = plan_map[plan]
+    db.commit()
+
+    return {"message": f"User {email} plan changed to {plan}"}
