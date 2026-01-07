@@ -9,6 +9,7 @@ import base64
 import json
 import time
 import uuid
+import tempfile
 from pathlib import Path
 import httpx
 from app.core.config import settings
@@ -63,22 +64,54 @@ class OCRService:
         Returns:
             (추출된 텍스트, OCR 메타데이터)
         """
-        if not os.path.exists(image_path):
+        # URL인 경우 다운로드하여 임시 파일로 처리
+        temp_file_path = None
+        if image_path.startswith("http://") or image_path.startswith("https://"):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(image_path)
+                    if response.status_code != 200:
+                        raise Exception(f"이미지 다운로드 실패: HTTP {response.status_code}")
+
+                    # URL에서 확장자 추출
+                    ext = ".jpg"
+                    if "." in image_path.split("/")[-1].split("?")[0]:
+                        ext = "." + image_path.split("/")[-1].split("?")[0].split(".")[-1].lower()
+                    if ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+                        ext = ".jpg"
+
+                    # 임시 파일 생성
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                    temp_file.write(response.content)
+                    temp_file.close()
+                    temp_file_path = temp_file.name
+                    image_path = temp_file_path
+            except httpx.RequestError as e:
+                raise Exception(f"이미지 URL 다운로드 중 오류: {str(e)}")
+        elif not os.path.exists(image_path):
             raise FileNotFoundError(f"이미지 파일을 찾을 수 없습니다: {image_path}")
 
-        # 수학 오답노트인 경우 Google Vision 사용 (설정되어 있으면)
-        if use_google_for_math and self.use_google_vision:
-            return await self._extract_with_google_vision(image_path)
+        try:
+            # 수학 오답노트인 경우 Google Vision 사용 (설정되어 있으면)
+            if use_google_for_math and self.use_google_vision:
+                return await self._extract_with_google_vision(image_path)
 
-        # CLOVA OCR 우선 사용
-        if self.use_clova_ocr:
-            return await self._extract_with_clova_ocr(image_path)
-        # Google Cloud Vision 사용
-        elif self.use_google_vision:
-            return await self._extract_with_google_vision(image_path)
-        else:
-            # 대안: Tesseract 사용
-            return await self._extract_with_tesseract(image_path)
+            # CLOVA OCR 우선 사용
+            if self.use_clova_ocr:
+                return await self._extract_with_clova_ocr(image_path)
+            # Google Cloud Vision 사용
+            elif self.use_google_vision:
+                return await self._extract_with_google_vision(image_path)
+            else:
+                # 대안: Tesseract 사용
+                return await self._extract_with_tesseract(image_path)
+        finally:
+            # 임시 파일 정리
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass  # 임시 파일 삭제 실패는 무시
 
     async def _extract_with_clova_ocr(self, image_path: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         """CLOVA OCR API로 텍스트 + bbox 추출"""
