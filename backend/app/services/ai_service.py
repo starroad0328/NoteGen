@@ -1188,7 +1188,19 @@ JSON:"""
         # 프롬프트 로드
         prompt_template = self._load_prompt("history_question_from_note")
         if not prompt_template:
-            raise Exception("역사 문제 생성 프롬프트를 찾을 수 없습니다.")
+            print(f"[AI] 프롬프트 파일 못 찾음, 인라인 프롬프트 사용", flush=True)
+            prompt_template = """다음 역사 노트 내용을 기반으로 객관식 문제를 {question_count}개 생성해주세요.
+
+[노트 내용]
+{note_content}
+
+[규칙]
+- 4지선다 객관식
+- 노트 내용에 있는 정보만 활용
+- JSON 배열만 출력
+
+[출력 형식]
+[{{"question_text": "문제", "choices": ["1","2","3","4"], "correct_answer": 0, "solution": "해설", "cognitive_level": "recall", "induced_error_tags": []}}]"""
 
         # 노트 내용이 너무 길면 앞부분만 사용
         truncated_content = note_content[:8000] if len(note_content) > 8000 else note_content
