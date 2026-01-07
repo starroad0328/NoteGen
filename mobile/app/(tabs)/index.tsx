@@ -142,9 +142,9 @@ export default function HomeTab() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickAction, { backgroundColor: colors.cardBg }]}
-            onPress={() => router.push('/(tabs)/practice')}
+            onPress={() => router.push('/(tabs)/questions')}
           >
-            <Text style={styles.quickActionIcon}>🧠</Text>
+            <Text style={styles.quickActionIcon}>📝</Text>
             <Text style={[styles.quickActionText, { color: colors.text }]}>문제 풀기</Text>
           </TouchableOpacity>
         </View>

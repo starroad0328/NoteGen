@@ -1056,6 +1056,115 @@ JSON:"""
             print(f"[AI] 요약 생성 실패: {e}", flush=True)
             raise e
 
+    async def generate_history_questions(
+        self,
+        concept_card: dict,
+        question_count: int = 5,
+        ai_model: Optional[AIModel] = None
+    ) -> list:
+        """
+        역사 개념 카드 기반 문제 생성
+
+        Args:
+            concept_card: ConceptCard.to_dict() 결과
+            question_count: 생성할 문제 수 (기본 5개)
+            ai_model: 사용할 AI 모델
+
+        Returns:
+            list: [
+                {
+                    "question_text": "문제 텍스트",
+                    "choices": ["선택지1", "선택지2", "선택지3", "선택지4"],
+                    "correct_answer": 0,
+                    "solution": "해설",
+                    "cognitive_level": "recall|sequence|cause_effect|compare",
+                    "induced_error_tags": ["term_confusion", ...]
+                },
+                ...
+            ]
+        """
+        if ai_model is None:
+            ai_model = AIModel.GPT_5_MINI
+
+        # 프롬프트 로드
+        prompt_template = self._load_prompt("history_question")
+        if not prompt_template:
+            raise Exception("역사 문제 생성 프롬프트를 찾을 수 없습니다.")
+
+        # 개념 카드를 JSON 문자열로 변환
+        card_json = json.dumps(concept_card, ensure_ascii=False, indent=2)
+
+        # 프롬프트 완성
+        prompt = prompt_template.replace("{card_json}", card_json)
+        prompt = prompt.replace("{question_count}", str(question_count))
+
+        print(f"[AI] 역사 문제 생성 시작 - 카드: {concept_card.get('title', 'Unknown')}, 문제 수: {question_count}", flush=True)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=ai_model.value,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "역사 교육 전문가입니다. 개념 카드 기반으로 교육적인 객관식 문제를 생성합니다. JSON 배열만 출력합니다."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_completion_tokens=4000,
+                temperature=0.7  # 다양한 문제 생성을 위해
+            )
+
+            result = response.choices[0].message.content
+            if not result:
+                print("[AI] 문제 생성 응답이 비어있음", flush=True)
+                return []
+
+            result = result.strip()
+
+            # JSON 파싱
+            if "```json" in result:
+                result = result.split("```json")[1].split("```")[0].strip()
+            elif "```" in result:
+                result = result.split("```")[1].split("```")[0].strip()
+
+            questions = json.loads(result)
+
+            # 유효성 검사
+            if not isinstance(questions, list):
+                print("[AI] 문제 생성 결과가 배열이 아님", flush=True)
+                return []
+
+            valid_questions = []
+            for q in questions[:question_count]:
+                if not isinstance(q, dict):
+                    continue
+                if "question_text" not in q or "choices" not in q:
+                    continue
+                if not isinstance(q.get("choices"), list) or len(q["choices"]) < 2:
+                    continue
+
+                valid_questions.append({
+                    "question_text": str(q.get("question_text", ""))[:1000],
+                    "choices": [str(c)[:500] for c in q.get("choices", [])[:4]],
+                    "correct_answer": int(q.get("correct_answer", 0)) % len(q.get("choices", [1])),
+                    "solution": str(q.get("solution", ""))[:1000],
+                    "cognitive_level": q.get("cognitive_level", "recall"),
+                    "induced_error_tags": q.get("induced_error_tags", [])
+                })
+
+            print(f"[AI] 역사 문제 생성 완료: {len(valid_questions)}개", flush=True)
+            return valid_questions
+
+        except json.JSONDecodeError as e:
+            print(f"[AI] 문제 생성 JSON 파싱 실패: {e}", flush=True)
+            return []
+        except Exception as e:
+            print(f"[AI] 문제 생성 실패: {e}", flush=True)
+            raise e
+
 
 # 싱글톤 인스턴스
 ai_service = AIService()

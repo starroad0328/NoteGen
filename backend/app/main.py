@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.database import init_db, get_db_session
 from app.core.seed_curriculum import seed_curriculum
 from app.core.seed_templates import seed_templates
-from app.api import upload, process, notes, auth, curriculum, payment, weak_concepts, templates, summary
+from app.api import upload, process, notes, auth, curriculum, payment, weak_concepts, templates, summary, questions
 
 # 데이터베이스 초기화
 init_db()
@@ -111,6 +111,12 @@ app.include_router(
     tags=["Summary"]
 )
 
+app.include_router(
+    questions.router,
+    prefix="/api/questions",
+    tags=["Questions"]
+)
+
 # 업로드된 이미지 정적 파일 서빙
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
@@ -154,6 +160,51 @@ async def startup_event():
             print("[MIGRATION] Added monthly_summary_usage column to users table")
         except Exception:
             db.rollback()  # 이미 존재하면 무시
+
+        # questions 테이블 생성 (없으면)
+        try:
+            db.execute(text("""
+                CREATE TABLE IF NOT EXISTS questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                    concept_card_id INTEGER REFERENCES concept_cards(id) ON DELETE SET NULL,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    question_text TEXT NOT NULL,
+                    choices TEXT,
+                    correct_answer INTEGER,
+                    solution TEXT,
+                    question_type VARCHAR(50) DEFAULT 'mcq',
+                    cognitive_level VARCHAR(50),
+                    induced_error_tags TEXT,
+                    evidence_spans TEXT,
+                    subject VARCHAR(50) DEFAULT 'history',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("[MIGRATION] Created questions table")
+        except Exception as e:
+            db.rollback()
+            print(f"[MIGRATION] questions table: {e}")
+
+        # user_question_attempts 테이블 생성 (없으면)
+        try:
+            db.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_question_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+                    selected_answer INTEGER NOT NULL,
+                    is_correct BOOLEAN NOT NULL,
+                    error_type VARCHAR(50),
+                    attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("[MIGRATION] Created user_question_attempts table")
+        except Exception as e:
+            db.rollback()
+            print(f"[MIGRATION] user_question_attempts table: {e}")
 
         db.close()
     except Exception as e:

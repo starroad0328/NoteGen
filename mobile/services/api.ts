@@ -609,4 +609,145 @@ export const summaryAPI = {
   },
 }
 
+/**
+ * 문제 API (역사 과목 MVP)
+ */
+export interface Question {
+  id: number
+  note_id: number
+  concept_card_id?: number
+  question_text: string
+  choices: string[]
+  correct_answer?: number  // 풀이 전에는 숨김
+  solution?: string
+  question_type: string
+  cognitive_level?: string
+  subject: string
+  created_at: string
+}
+
+export interface QuestionGenerateResponse {
+  message: string
+  question_count: number
+  questions: Question[]
+}
+
+export interface QuestionListResponse {
+  note_id?: number
+  note_title?: string
+  total?: number
+  question_count?: number
+  questions: Question[]
+}
+
+export interface QuestionSubmitResult {
+  is_correct: boolean
+  correct_answer: number
+  selected_answer: number
+  solution: string
+  error_type?: string
+}
+
+export interface QuestionStats {
+  total_questions: number
+  total_attempts: number
+  correct_count: number
+  accuracy: number
+  error_stats: Record<string, number>
+  top_errors: { error_type: string; count: number }[]
+}
+
+export interface WeakPracticeResponse {
+  recommendation_type: string
+  top_error_types?: string[]
+  message: string
+  questions: Question[]
+}
+
+export const questionsAPI = {
+  // 노트에서 문제 생성
+  generate: async (
+    token: string,
+    noteId: number,
+    questionCount: number = 5
+  ): Promise<QuestionGenerateResponse> => {
+    const response = await apiClient.post(
+      `/api/questions/generate/${noteId}?question_count=${questionCount}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    return response.data
+  },
+
+  // 노트별 문제 목록 조회
+  getByNote: async (
+    token: string,
+    noteId: number,
+    includeSolved: boolean = true
+  ): Promise<QuestionListResponse> => {
+    const response = await apiClient.get(
+      `/api/questions/note/${noteId}?include_solved=${includeSolved}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    return response.data
+  },
+
+  // 전체 문제 목록 조회
+  getAll: async (
+    token: string,
+    subject?: string,
+    skip: number = 0,
+    limit: number = 50
+  ): Promise<QuestionListResponse> => {
+    let url = `/api/questions/?skip=${skip}&limit=${limit}`
+    if (subject) url += `&subject=${subject}`
+    const response = await apiClient.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 문제 상세 조회
+  getQuestion: async (token: string, questionId: number): Promise<Question> => {
+    const response = await apiClient.get(`/api/questions/${questionId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 답안 제출
+  submit: async (
+    token: string,
+    questionId: number,
+    selectedAnswer: number
+  ): Promise<QuestionSubmitResult> => {
+    const response = await apiClient.post(
+      `/api/questions/${questionId}/submit?selected_answer=${selectedAnswer}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    return response.data
+  },
+
+  // 풀이 통계 조회
+  getStats: async (token: string): Promise<QuestionStats> => {
+    const response = await apiClient.get('/api/questions/stats/summary', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  // 취약점 기반 맞춤 문제
+  getWeakPractice: async (
+    token: string,
+    limit: number = 5
+  ): Promise<WeakPracticeResponse> => {
+    const response = await apiClient.get(
+      `/api/questions/weak-practice?limit=${limit}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    return response.data
+  },
+}
+
 export default apiClient

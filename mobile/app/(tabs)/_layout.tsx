@@ -59,6 +59,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="questions"
+        options={{
+          title: '문제',
+          tabBarIcon: ({ color, size }) => (
+            <Text style={{ fontSize: size, color }}>📝</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="practice"
         options={{
           title: 'PRO',

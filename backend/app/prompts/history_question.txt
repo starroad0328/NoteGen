@@ -1,0 +1,64 @@
+다음 개념 카드를 기반으로 역사 객관식 문제를 생성해주세요.
+
+[개념 카드]
+{card_json}
+
+[문제 생성 규칙]
+
+1. 문제 개수: {question_count}개
+
+2. 인지 단계별 문제 유형:
+   - recall: 용어/사건/인물 회상 (예: "다음 중 OOO의 업적으로 옳은 것은?")
+   - sequence: 연도/순서 배열 (예: "다음 사건을 시간순으로 나열할 때...")
+   - cause_effect: 원인-결과 연결 (예: "OOO의 원인으로 옳은 것은?")
+   - compare: 비교/구분 (예: "OOO와 XXX의 차이점으로 옳지 않은 것은?")
+
+3. 선택지 설계 규칙:
+   - 4지선다로 구성
+   - 정답 1개 + 오답 3개
+   - 오답 선택지는 학생들이 자주 틀리는 유형 반영:
+     * term_confusion: 비슷한 용어/개념으로 혼동 유도
+     * chronology_confusion: 연도/순서 바꿔서 혼동 유도
+     * cause_effect_mixup: 원인과 결과를 뒤바꿔서 혼동 유도
+     * comparison_miss: 비교 대상의 특징을 섞어서 혼동 유도
+
+4. 해설 규칙:
+   - evidence_spans에 명시된 필기 근거 인용
+   - 왜 정답인지, 왜 나머지가 오답인지 간단히 설명
+   - 1-2문장으로 간결하게
+
+5. 필수 준수사항:
+   - 개념 카드의 content와 evidence_spans에 있는 내용만 활용
+   - 외부 지식 추가 금지
+   - 근거 없는 내용으로 문제 생성 금지
+
+[출력 형식 - JSON 배열]
+반드시 아래 형식의 JSON 배열만 출력하세요. 다른 설명 없이 JSON만 출력:
+
+[
+  {
+    "question_text": "문제 텍스트 (완전한 문장으로)",
+    "choices": ["선택지1", "선택지2", "선택지3", "선택지4"],
+    "correct_answer": 0,
+    "solution": "해설 (1-2문장)",
+    "cognitive_level": "recall|sequence|cause_effect|compare",
+    "induced_error_tags": ["term_confusion", "chronology_confusion"]
+  }
+]
+
+[예시 출력]
+[
+  {
+    "question_text": "조선 전기 경국대전에 대한 설명으로 옳은 것은?",
+    "choices": [
+      "성종 때 완성되어 조선의 기본 법전이 되었다",
+      "태종 때 편찬을 시작하여 세종 때 완성되었다",
+      "훈민정음을 반포하기 위해 만들어졌다",
+      "임진왜란 이후 재편찬되었다"
+    ],
+    "correct_answer": 0,
+    "solution": "경국대전은 세조 때 편찬을 시작하여 성종 때 완성된 조선의 기본 법전이다. (필기 3줄 참조)",
+    "cognitive_level": "recall",
+    "induced_error_tags": ["chronology_confusion", "term_confusion"]
+  }
+]
