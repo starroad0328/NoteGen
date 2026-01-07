@@ -48,8 +48,12 @@ async def generate_questions(
     if not note:
         raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
 
-    # 역사 과목 확인
-    if note.detected_subject and note.detected_subject.value != "history":
+    # 역사 과목 확인 (detected_subject가 history이거나 제목에 '역사' 포함)
+    is_history = (
+        (note.detected_subject and note.detected_subject.value == "history") or
+        (note.title and "역사" in note.title)
+    )
+    if note.detected_subject and note.detected_subject.value != "history" and not is_history:
         raise HTTPException(
             status_code=400,
             detail=f"현재 역사 과목만 문제 생성을 지원합니다. (현재 과목: {note.detected_subject.value})"
