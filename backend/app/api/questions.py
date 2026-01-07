@@ -115,11 +115,15 @@ async def generate_questions(
 
         try:
             print(f"[Questions API] 노트 기반 문제 생성 시작 - note_id: {note_id}", flush=True)
+            print(f"[Questions API] 노트 내용 길이: {len(note.organized_content or '')} 글자", flush=True)
             generated = await ai_service.generate_history_questions_from_note(
                 note_content=note.organized_content,
                 question_count=question_count
             )
             print(f"[Questions API] AI 응답 받음 - {len(generated)}개 문제", flush=True)
+
+            if not generated:
+                print(f"[Questions API] AI가 문제를 생성하지 못함", flush=True)
 
             for i, q in enumerate(generated):
                 try:
