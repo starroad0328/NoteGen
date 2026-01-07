@@ -262,7 +262,7 @@ export default function NoteScreen() {
           <TouchableOpacity onPress={openDrawer} style={styles.headerButton}>
             <Text style={styles.buttonIcon}>☰</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleCopy} style={styles.headerButton>
+          <TouchableOpacity onPress={handleCopy} style={styles.headerButton}>
             <Text style={styles.buttonIcon}>📋</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
