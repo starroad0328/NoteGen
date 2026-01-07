@@ -751,6 +751,14 @@ export const questionsAPI = {
     )
     return response.data
   },
+
+  // 전체 문제 삭제
+  deleteAll: async (token: string): Promise<{ deleted_count: number; message: string }> => {
+    const response = await apiClient.delete('/api/questions/all', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
 }
 
 export default apiClient

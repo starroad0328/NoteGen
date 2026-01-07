@@ -35,6 +35,40 @@ export default function QuestionsTab() {
   const [showNoteModal, setShowNoteModal] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // 문제를 노트별로 그룹화
+  interface NoteQuestionGroup {
+    noteId: number
+    noteTitle: string
+    questionCount: number
+    latestDate: string
+  }
+
+  const groupedByNote = (): NoteQuestionGroup[] => {
+    const groups: Record<number, NoteQuestionGroup> = {}
+
+    for (const q of questions) {
+      if (!groups[q.note_id]) {
+        // 노트 제목 찾기
+        const note = historyNotes.find(n => n.id === q.note_id)
+        groups[q.note_id] = {
+          noteId: q.note_id,
+          noteTitle: note?.title || `노트 #${q.note_id}`,
+          questionCount: 0,
+          latestDate: q.created_at,
+        }
+      }
+      groups[q.note_id].questionCount++
+      if (q.created_at > groups[q.note_id].latestDate) {
+        groups[q.note_id].latestDate = q.created_at
+      }
+    }
+
+    return Object.values(groups).sort((a, b) =>
+      new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime()
+    )
+  }
 
   const fetchData = async () => {
     if (!token) return
@@ -83,6 +117,35 @@ export default function QuestionsTab() {
     await fetchData()
     setRefreshing(false)
   }, [token])
+
+  const handleDeleteAll = async () => {
+    if (!token) return
+
+    Alert.alert(
+      '전체 삭제',
+      '생성된 모든 문제를 삭제하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true)
+            try {
+              const result = await questionsAPI.deleteAll(token)
+              Alert.alert('완료', result.message)
+              fetchData()
+            } catch (error: any) {
+              console.error('문제 삭제 실패:', error)
+              Alert.alert('오류', '문제 삭제 중 오류가 발생했습니다.')
+            } finally {
+              setDeleting(false)
+            }
+          }
+        }
+      ]
+    )
+  }
 
   const handleGenerateQuestions = async (noteId: number) => {
     if (!token) return
@@ -148,10 +211,27 @@ export default function QuestionsTab() {
         <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
           {/* 헤더 */}
           <View style={styles.header}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>문제</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textLight }]}>
-              역사 과목 문제 풀이
-            </Text>
+            <View style={styles.headerRow}>
+              <View>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>문제</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textLight }]}>
+                  역사 과목 문제 풀이
+                </Text>
+              </View>
+              {questions.length > 0 && (
+                <TouchableOpacity
+                  style={[styles.deleteButton, { borderColor: '#EF4444' }]}
+                  onPress={handleDeleteAll}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <ActivityIndicator size="small" color="#EF4444" />
+                  ) : (
+                    <Text style={styles.deleteButtonText}>전체 삭제</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* 통계 카드 */}
@@ -212,30 +292,31 @@ export default function QuestionsTab() {
             </View>
           )}
 
-          {/* 전체 문제 목록 */}
+          {/* 전체 문제 목록 - 노트별 그룹화 */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>내 문제</Text>
 
-            {questions.length > 0 ? (
-              questions.slice(0, 10).map((q) => (
+            {groupedByNote().length > 0 ? (
+              groupedByNote().map((group) => (
                 <TouchableOpacity
-                  key={q.id}
+                  key={group.noteId}
                   style={[styles.questionCard, { backgroundColor: colors.cardBg }]}
-                  onPress={() => router.push(`/questions/${q.note_id}`)}
+                  onPress={() => router.push(`/questions/${group.noteId}`)}
                 >
-                  <Text style={[styles.questionText, { color: colors.text }]} numberOfLines={2}>
-                    {q.question_text}
-                  </Text>
+                  <View style={styles.groupHeader}>
+                    <Text style={[styles.groupTitle, { color: colors.text }]} numberOfLines={1}>
+                      {group.noteTitle}
+                    </Text>
+                    <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.countText}>{group.questionCount}</Text>
+                    </View>
+                  </View>
                   <View style={styles.questionMeta}>
-                    {q.cognitive_level && (
-                      <View style={[styles.levelBadge, { backgroundColor: colors.primary + '20' }]}>
-                        <Text style={[styles.levelText, { color: colors.primary }]}>
-                          {getCognitiveLevelLabel(q.cognitive_level)}
-                        </Text>
-                      </View>
-                    )}
+                    <Text style={[styles.groupSubtitle, { color: colors.textLight }]}>
+                      {group.questionCount}개의 문제
+                    </Text>
                     <Text style={[styles.dateText, { color: colors.textLight }]}>
-                      {new Date(q.created_at).toLocaleDateString('ko-KR')}
+                      {new Date(group.latestDate).toLocaleDateString('ko-KR')}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -364,6 +445,11 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -371,6 +457,17 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 15,
     marginTop: 4,
+  },
+  deleteButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  deleteButtonText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // 통계 카드
@@ -434,6 +531,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  groupTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 12,
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  countText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  groupSubtitle: {
+    fontSize: 13,
   },
   questionText: {
     fontSize: 15,
