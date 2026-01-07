@@ -23,6 +23,7 @@ import * as Clipboard from 'expo-clipboard'
 import { notesAPI, questionsAPI, Note, API_BASE_URL } from '../../services/api'
 import { NoteRenderer, convertToNoteData, NoteData } from '../../components/note'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
@@ -40,6 +41,7 @@ export default function NoteScreen() {
   const { id } = useLocalSearchParams()
   const noteId = parseInt(id as string)
   const { colors } = useTheme()
+  const { token } = useAuth()
 
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
@@ -171,7 +173,7 @@ export default function NoteScreen() {
 
     setGeneratingQuestions(true)
     try {
-      const result = await questionsAPI.generate(noteId, 5)
+      const result = await questionsAPI.generate(token!, noteId, 5)
 
       if (result.question_count > 0) {
         Alert.alert(

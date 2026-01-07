@@ -22,7 +22,7 @@ import { questionsAPI, Question, QuestionStats, WeakPracticeResponse } from '../
 export default function QuestionsTab() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { user, loading: authLoading } = useAuth()
+  const { user, token, loading: authLoading } = useAuth()
   const { colors } = useTheme()
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -32,11 +32,12 @@ export default function QuestionsTab() {
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchData = async () => {
+    if (!token) return
     try {
       const [questionsData, statsData, weakData] = await Promise.all([
-        questionsAPI.getAll(50),
-        questionsAPI.getStats(),
-        questionsAPI.getWeakPractice(5),
+        questionsAPI.getAll(token, undefined, 0, 50),
+        questionsAPI.getStats(token),
+        questionsAPI.getWeakPractice(token, 5),
       ])
       setQuestions(questionsData.questions)
       setStats(statsData)
@@ -50,19 +51,19 @@ export default function QuestionsTab() {
 
   useFocusEffect(
     useCallback(() => {
-      if (user) {
+      if (user && token) {
         fetchData()
       } else {
         setLoading(false)
       }
-    }, [user])
+    }, [user, token])
   )
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     await fetchData()
     setRefreshing(false)
-  }, [])
+  }, [token])
 
   if (authLoading || loading) {
     return (

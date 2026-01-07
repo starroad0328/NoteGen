@@ -17,6 +17,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { questionsAPI, Question, QuestionSubmitResult } from '../../services/api'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function QuestionSolveScreen() {
   const router = useRouter()
@@ -24,6 +25,7 @@ export default function QuestionSolveScreen() {
   const { noteId } = useLocalSearchParams()
   const noteIdNum = parseInt(noteId as string)
   const { colors } = useTheme()
+  const { token } = useAuth()
 
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,12 +42,13 @@ export default function QuestionSolveScreen() {
   const isCompleted = currentIndex >= questions.length && questions.length > 0
 
   useEffect(() => {
-    fetchQuestions()
-  }, [])
+    if (token) fetchQuestions()
+  }, [token])
 
   const fetchQuestions = async () => {
+    if (!token) return
     try {
-      const data = await questionsAPI.getByNote(noteIdNum)
+      const data = await questionsAPI.getByNote(token, noteIdNum)
       setQuestions(data.questions)
       setNoteTitle(data.note_title)
     } catch (error) {
@@ -62,11 +65,11 @@ export default function QuestionSolveScreen() {
   }
 
   const handleSubmit = async () => {
-    if (selectedAnswer === null || !currentQuestion) return
+    if (selectedAnswer === null || !currentQuestion || !token) return
 
     setSubmitting(true)
     try {
-      const submitResult = await questionsAPI.submit(currentQuestion.id, selectedAnswer)
+      const submitResult = await questionsAPI.submit(token, currentQuestion.id, selectedAnswer)
       setResult(submitResult)
     } catch (error) {
       console.error('답안 제출 오류:', error)
