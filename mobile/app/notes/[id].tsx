@@ -20,10 +20,9 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Clipboard from 'expo-clipboard'
-import { notesAPI, questionsAPI, Note, API_BASE_URL } from '../../services/api'
+import { notesAPI, Note, API_BASE_URL } from '../../services/api'
 import { NoteRenderer, convertToNoteData, NoteData } from '../../components/note'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAuth } from '../../contexts/AuthContext'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75
@@ -41,13 +40,11 @@ export default function NoteScreen() {
   const { id } = useLocalSearchParams()
   const noteId = parseInt(id as string)
   const { colors } = useTheme()
-  const { token } = useAuth()
 
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
-  const [generatingQuestions, setGeneratingQuestions] = useState(false)
 
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current
   const contentScrollRef = useRef<ScrollView>(null)
@@ -159,46 +156,6 @@ export default function NoteScreen() {
     )
   }
 
-  const handleGenerateQuestions = async () => {
-    if (!note) return
-
-    // 역사 과목인지 확인
-    if (note.detected_subject !== 'history') {
-      Alert.alert(
-        '지원하지 않는 과목',
-        '현재 역사 과목만 문제 생성을 지원합니다.'
-      )
-      return
-    }
-
-    setGeneratingQuestions(true)
-    try {
-      const result = await questionsAPI.generate(token!, noteId, 5)
-
-      if (result.question_count > 0) {
-        Alert.alert(
-          '문제 생성 완료',
-          `${result.question_count}개의 문제가 생성되었습니다.`,
-          [
-            {
-              text: '문제 풀기',
-              onPress: () => router.push(`/questions/${noteId}`),
-            },
-            { text: '나중에', style: 'cancel' },
-          ]
-        )
-      } else {
-        Alert.alert('알림', '생성할 문제가 없습니다. 노트에 개념 카드가 있는지 확인해주세요.')
-      }
-    } catch (error: any) {
-      console.error('문제 생성 오류:', error)
-      const message = error?.message || '문제 생성 중 오류가 발생했습니다.'
-      Alert.alert('오류', message)
-    } finally {
-      setGeneratingQuestions(false)
-    }
-  }
-
   const handleScroll = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x
     const page = Math.round(offsetX / SCREEN_WIDTH)
@@ -305,20 +262,7 @@ export default function NoteScreen() {
           <TouchableOpacity onPress={openDrawer} style={styles.headerButton}>
             <Text style={styles.buttonIcon}>☰</Text>
           </TouchableOpacity>
-          {note.detected_subject === 'history' && (
-            <TouchableOpacity
-              onPress={handleGenerateQuestions}
-              style={styles.headerButton}
-              disabled={generatingQuestions}
-            >
-              {generatingQuestions ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={styles.buttonIcon}>📝</Text>
-              )}
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleCopy} style={styles.headerButton}>
+          <TouchableOpacity onPress={handleCopy} style={styles.headerButton>
             <Text style={styles.buttonIcon}>📋</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
