@@ -110,31 +110,48 @@ async def generate_questions(
             )
 
         try:
+            print(f"[Questions API] 노트 기반 문제 생성 시작 - note_id: {note_id}", flush=True)
             generated = await ai_service.generate_history_questions_from_note(
                 note_content=note.organized_content,
                 question_count=question_count
             )
+            print(f"[Questions API] AI 응답 받음 - {len(generated)}개 문제", flush=True)
 
-            for q in generated:
-                question = Question(
-                    note_id=note_id,
-                    concept_card_id=None,
-                    user_id=current_user.id,
-                    question_text=q["question_text"],
-                    choices=q["choices"],
-                    correct_answer=q["correct_answer"],
-                    solution=q["solution"],
-                    question_type=QuestionType.MCQ,
-                    cognitive_level=CognitiveLevel(q["cognitive_level"]) if q.get("cognitive_level") else None,
-                    induced_error_tags=q.get("induced_error_tags", []),
-                    evidence_spans=[],
-                    subject="history"
-                )
-                db.add(question)
-                all_questions.append(question)
+            for i, q in enumerate(generated):
+                try:
+                    # cognitive_level 안전 변환
+                    cog_level = None
+                    if q.get("cognitive_level"):
+                        try:
+                            cog_level = CognitiveLevel(q["cognitive_level"])
+                        except ValueError:
+                            print(f"[Questions API] 유효하지 않은 cognitive_level: {q['cognitive_level']}", flush=True)
+                            cog_level = CognitiveLevel.RECALL
+
+                    question = Question(
+                        note_id=note_id,
+                        concept_card_id=None,
+                        user_id=current_user.id,
+                        question_text=q["question_text"],
+                        choices=q["choices"],
+                        correct_answer=q["correct_answer"],
+                        solution=q.get("solution", ""),
+                        question_type=QuestionType.MCQ,
+                        cognitive_level=cog_level,
+                        induced_error_tags=q.get("induced_error_tags", []),
+                        evidence_spans=[],
+                        subject="history"
+                    )
+                    db.add(question)
+                    all_questions.append(question)
+                except Exception as qe:
+                    print(f"[Questions API] 문제 {i} 저장 실패: {qe}", flush=True)
+                    continue
 
         except Exception as e:
-            print(f"[Questions API] 노트 기반 문제 생성 실패: {e}", flush=True)
+            print(f"[Questions API] 노트 기반 문제 생성 실패: {type(e).__name__}: {e}", flush=True)
+            import traceback
+            print(f"[Questions API] Traceback: {traceback.format_exc()}", flush=True)
             raise HTTPException(status_code=500, detail="문제 생성 중 오류가 발생했습니다.")
 
     db.commit()

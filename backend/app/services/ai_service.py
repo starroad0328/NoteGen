@@ -1270,11 +1270,14 @@ JSON:"""
             return valid_questions
 
         except json.JSONDecodeError as e:
-            print(f"[AI] 문제 생성 JSON 파싱 실패: {e}", flush=True)
+            print(f"[AI] 노트 기반 문제 생성 JSON 파싱 실패: {e}", flush=True)
+            print(f"[AI] 파싱 실패한 응답: {result[:500] if result else 'None'}", flush=True)
             return []
         except Exception as e:
-            print(f"[AI] 문제 생성 실패: {e}", flush=True)
-            raise e
+            print(f"[AI] 노트 기반 문제 생성 실패: {type(e).__name__}: {e}", flush=True)
+            import traceback
+            print(f"[AI] Traceback: {traceback.format_exc()}", flush=True)
+            return []
 
 
 # 싱글톤 인스턴스
