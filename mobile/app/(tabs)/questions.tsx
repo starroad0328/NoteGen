@@ -39,19 +39,23 @@ export default function QuestionsTab() {
   const fetchData = async () => {
     if (!token) return
     try {
-      const [questionsData, statsData, notesData] = await Promise.all([
+      const [questionsData, statsData, notesResponse] = await Promise.all([
         questionsAPI.getAll(token, undefined, 0, 50),
         questionsAPI.getStats(token).catch(() => null),
-        notesAPI.getNotes(token, 0, 100),
+        notesAPI.list(0, 100, token),
       ])
       setQuestions(questionsData.questions)
       setStats(statsData)
 
+      // notesAPI.list 반환값 처리 (배열 또는 {notes: []} 형태)
+      const notesArray = Array.isArray(notesResponse)
+        ? notesResponse
+        : (notesResponse as any).notes || []
+
       // 역사 과목 노트만 필터링
       // - detected_subject가 history이거나
       // - 제목에 '역사'가 포함되어 있거나
-      // - status가 completed인 노트 중 위 조건에 해당하는 것
-      const historyOnly = notesData.notes.filter((n: Note) =>
+      const historyOnly = notesArray.filter((n: Note) =>
         n.detected_subject === 'history' ||
         (n as any).subject === 'history' ||
         n.title?.includes('역사')
