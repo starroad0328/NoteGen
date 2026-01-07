@@ -60,33 +60,65 @@ async def generate_questions(
         ConceptCard.note_id == note_id
     ).all()
 
-    if not concept_cards:
-        raise HTTPException(
-            status_code=400,
-            detail="이 노트에 개념 카드가 없습니다. 노트를 먼저 정리해주세요."
-        )
-
-    # 각 개념 카드에서 문제 생성
     all_questions = []
-    questions_per_card = max(1, question_count // len(concept_cards))
-    remaining = question_count - (questions_per_card * len(concept_cards))
 
-    for i, card in enumerate(concept_cards):
-        count = questions_per_card + (1 if i < remaining else 0)
-        if count == 0:
-            continue
+    if concept_cards:
+        # 개념 카드가 있으면 카드 기반 문제 생성
+        questions_per_card = max(1, question_count // len(concept_cards))
+        remaining = question_count - (questions_per_card * len(concept_cards))
+
+        for i, card in enumerate(concept_cards):
+            count = questions_per_card + (1 if i < remaining else 0)
+            if count == 0:
+                continue
+
+            try:
+                generated = await ai_service.generate_history_questions(
+                    concept_card=card.to_dict(),
+                    question_count=count
+                )
+
+                for q in generated:
+                    question = Question(
+                        note_id=note_id,
+                        concept_card_id=card.id,
+                        user_id=current_user.id,
+                        question_text=q["question_text"],
+                        choices=q["choices"],
+                        correct_answer=q["correct_answer"],
+                        solution=q["solution"],
+                        question_type=QuestionType.MCQ,
+                        cognitive_level=CognitiveLevel(q["cognitive_level"]) if q.get("cognitive_level") else None,
+                        induced_error_tags=q.get("induced_error_tags", []),
+                        evidence_spans=card.evidence_spans,
+                        subject="history"
+                    )
+                    db.add(question)
+                    all_questions.append(question)
+
+                card.question_count = (card.question_count or 0) + len(generated)
+
+            except Exception as e:
+                print(f"[Questions API] 카드 {card.id} 문제 생성 실패: {e}", flush=True)
+                continue
+    else:
+        # 개념 카드가 없으면 노트 내용에서 직접 문제 생성
+        if not note.organized_content:
+            raise HTTPException(
+                status_code=400,
+                detail="노트에 정리된 내용이 없습니다."
+            )
 
         try:
-            generated = await ai_service.generate_history_questions(
-                concept_card=card.to_dict(),
-                question_count=count
+            generated = await ai_service.generate_history_questions_from_note(
+                note_content=note.organized_content,
+                question_count=question_count
             )
 
             for q in generated:
-                # DB에 저장
                 question = Question(
                     note_id=note_id,
-                    concept_card_id=card.id,
+                    concept_card_id=None,
                     user_id=current_user.id,
                     question_text=q["question_text"],
                     choices=q["choices"],
@@ -95,18 +127,15 @@ async def generate_questions(
                     question_type=QuestionType.MCQ,
                     cognitive_level=CognitiveLevel(q["cognitive_level"]) if q.get("cognitive_level") else None,
                     induced_error_tags=q.get("induced_error_tags", []),
-                    evidence_spans=card.evidence_spans,
+                    evidence_spans=[],
                     subject="history"
                 )
                 db.add(question)
                 all_questions.append(question)
 
-            # 개념 카드의 문제 생성 횟수 업데이트
-            card.question_count = (card.question_count or 0) + len(generated)
-
         except Exception as e:
-            print(f"[Questions API] 카드 {card.id} 문제 생성 실패: {e}", flush=True)
-            continue
+            print(f"[Questions API] 노트 기반 문제 생성 실패: {e}", flush=True)
+            raise HTTPException(status_code=500, detail="문제 생성 중 오류가 발생했습니다.")
 
     db.commit()
 

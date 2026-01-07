@@ -1165,6 +1165,105 @@ JSON:"""
             print(f"[AI] 문제 생성 실패: {e}", flush=True)
             raise e
 
+    async def generate_history_questions_from_note(
+        self,
+        note_content: str,
+        question_count: int = 5,
+        ai_model: Optional[AIModel] = None
+    ) -> list:
+        """
+        역사 노트 내용 기반 문제 생성 (개념 카드 없이)
+
+        Args:
+            note_content: 정리된 노트 내용
+            question_count: 생성할 문제 수 (기본 5개)
+            ai_model: 사용할 AI 모델
+
+        Returns:
+            list: 문제 리스트
+        """
+        if ai_model is None:
+            ai_model = AIModel.GPT_5_MINI
+
+        # 프롬프트 로드
+        prompt_template = self._load_prompt("history_question_from_note")
+        if not prompt_template:
+            raise Exception("역사 문제 생성 프롬프트를 찾을 수 없습니다.")
+
+        # 노트 내용이 너무 길면 앞부분만 사용
+        truncated_content = note_content[:8000] if len(note_content) > 8000 else note_content
+
+        # 프롬프트 완성
+        prompt = prompt_template.replace("{note_content}", truncated_content)
+        prompt = prompt.replace("{question_count}", str(question_count))
+
+        print(f"[AI] 노트 기반 역사 문제 생성 시작 - 문제 수: {question_count}", flush=True)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=ai_model.value,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "역사 교육 전문가입니다. 노트 내용 기반으로 교육적인 객관식 문제를 생성합니다. JSON 배열만 출력합니다."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_completion_tokens=4000,
+                temperature=0.7
+            )
+
+            result = response.choices[0].message.content
+            if not result:
+                print("[AI] 문제 생성 응답이 비어있음", flush=True)
+                return []
+
+            result = result.strip()
+
+            # JSON 파싱
+            if "```json" in result:
+                result = result.split("```json")[1].split("```")[0].strip()
+            elif "```" in result:
+                result = result.split("```")[1].split("```")[0].strip()
+
+            questions = json.loads(result)
+
+            # 유효성 검사
+            if not isinstance(questions, list):
+                print("[AI] 문제 생성 결과가 배열이 아님", flush=True)
+                return []
+
+            valid_questions = []
+            for q in questions[:question_count]:
+                if not isinstance(q, dict):
+                    continue
+                if "question_text" not in q or "choices" not in q:
+                    continue
+                if not isinstance(q.get("choices"), list) or len(q["choices"]) < 2:
+                    continue
+
+                valid_questions.append({
+                    "question_text": str(q.get("question_text", ""))[:1000],
+                    "choices": [str(c)[:500] for c in q.get("choices", [])[:4]],
+                    "correct_answer": int(q.get("correct_answer", 0)) % len(q.get("choices", [1])),
+                    "solution": str(q.get("solution", ""))[:1000],
+                    "cognitive_level": q.get("cognitive_level", "recall"),
+                    "induced_error_tags": q.get("induced_error_tags", [])
+                })
+
+            print(f"[AI] 노트 기반 역사 문제 생성 완료: {len(valid_questions)}개", flush=True)
+            return valid_questions
+
+        except json.JSONDecodeError as e:
+            print(f"[AI] 문제 생성 JSON 파싱 실패: {e}", flush=True)
+            return []
+        except Exception as e:
+            print(f"[AI] 문제 생성 실패: {e}", flush=True)
+            raise e
+
 
 # 싱글톤 인스턴스
 ai_service = AIService()
