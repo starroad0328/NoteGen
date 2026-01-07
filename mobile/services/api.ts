@@ -665,7 +665,7 @@ export interface WeakPracticeResponse {
 }
 
 export const questionsAPI = {
-  // 노트에서 문제 생성
+  // 노트에서 문제 생성 (AI 처리로 인해 타임아웃 60초)
   generate: async (
     token: string,
     noteId: number,
@@ -674,7 +674,10 @@ export const questionsAPI = {
     const response = await apiClient.post(
       `/api/questions/generate/${noteId}?question_count=${questionCount}`,
       {},
-      { headers: { Authorization: `Bearer ${token}` } }
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 60000  // 60초 타임아웃
+      }
     )
     return response.data
   },
