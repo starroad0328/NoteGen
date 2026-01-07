@@ -381,6 +381,35 @@ async def get_weak_practice_questions(
     }
 
 
+@router.delete("/all")
+async def delete_all_questions(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """
+    사용자의 모든 문제 삭제
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+    # 풀이 기록 먼저 삭제
+    db.query(UserQuestionAttempt).filter(
+        UserQuestionAttempt.user_id == current_user.id
+    ).delete()
+
+    # 문제 삭제
+    deleted_count = db.query(Question).filter(
+        Question.user_id == current_user.id
+    ).delete()
+
+    db.commit()
+
+    return {
+        "message": f"{deleted_count}개의 문제가 삭제되었습니다.",
+        "deleted_count": deleted_count
+    }
+
+
 @router.get("/{question_id}")
 async def get_question(
     question_id: int,

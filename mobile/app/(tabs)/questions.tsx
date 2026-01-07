@@ -95,24 +95,20 @@ export default function QuestionsTab() {
       const result = await questionsAPI.generate(token, noteId, 5)
 
       if (result.question_count > 0) {
-        Alert.alert(
-          '문제 생성 완료',
-          `${result.question_count}개의 문제가 생성되었습니다.`,
-          [
-            { text: '나중에', style: 'cancel', onPress: () => fetchData() },
-            { text: '풀기', onPress: () => router.push(`/questions/${noteId}`) },
-          ]
-        )
+        // 듀오링고 스타일: 생성 완료 후 바로 문제 풀이 화면으로 이동
+        setGenerating(false)
+        setSelectedNoteId(null)
+        router.push(`/questions/${noteId}`)
       } else {
         Alert.alert('알림', '문제를 생성하지 못했습니다. 노트 내용을 확인해주세요.')
+        setGenerating(false)
+        setSelectedNoteId(null)
       }
     } catch (error: any) {
       console.error('문제 생성 실패:', error)
       Alert.alert('오류', error?.message || '문제 생성 중 오류가 발생했습니다.')
-    } finally {
       setGenerating(false)
       setSelectedNoteId(null)
-      fetchData()
     }
   }
 
