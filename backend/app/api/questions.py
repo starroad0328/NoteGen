@@ -249,86 +249,7 @@ async def list_questions(
     }
 
 
-@router.get("/{question_id}")
-async def get_question(
-    question_id: int,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
-):
-    """
-    문제 상세 조회 (정답 미포함)
-    """
-    if not current_user:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-
-    question = db.query(Question).filter(
-        Question.id == question_id,
-        Question.user_id == current_user.id
-    ).first()
-
-    if not question:
-        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
-
-    return question.to_dict(include_answer=False)
-
-
-@router.post("/{question_id}/submit")
-async def submit_answer(
-    question_id: int,
-    selected_answer: int,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
-):
-    """
-    답안 제출 및 채점
-
-    - **question_id**: 문제 ID
-    - **selected_answer**: 선택한 답 인덱스 (0-based)
-    """
-    if not current_user:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-
-    question = db.query(Question).filter(
-        Question.id == question_id,
-        Question.user_id == current_user.id
-    ).first()
-
-    if not question:
-        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
-
-    # 유효한 답인지 확인
-    if selected_answer < 0 or selected_answer >= len(question.choices or []):
-        raise HTTPException(status_code=400, detail="유효하지 않은 답입니다.")
-
-    # 정답 여부 확인
-    is_correct = selected_answer == question.correct_answer
-
-    # 오답일 경우 오류 태그 결정
-    error_type = None
-    if not is_correct and question.induced_error_tags:
-        # 선택한 답에 해당하는 오류 태그 (단순화: 첫 번째 태그 사용)
-        error_type = question.induced_error_tags[0] if question.induced_error_tags else None
-
-    # 풀이 기록 저장
-    attempt = UserQuestionAttempt(
-        user_id=current_user.id,
-        question_id=question_id,
-        selected_answer=selected_answer,
-        is_correct=is_correct,
-        error_type=error_type
-    )
-    db.add(attempt)
-    db.commit()
-
-    return {
-        "is_correct": is_correct,
-        "correct_answer": question.correct_answer,
-        "selected_answer": selected_answer,
-        "solution": question.solution,
-        "error_type": error_type
-    }
-
-
+# 중요: /stats/summary와 /weak-practice는 /{question_id}보다 먼저 정의해야 함
 @router.get("/stats/summary")
 async def get_question_stats(
     db: Session = Depends(get_db),
@@ -449,4 +370,84 @@ async def get_weak_practice_questions(
         "top_error_types": top_errors,
         "message": f"'{top_errors[0]}' 유형을 집중적으로 연습해보세요." if top_errors else "",
         "questions": [q.to_dict(include_answer=False) for q in recommended]
+    }
+
+
+@router.get("/{question_id}")
+async def get_question(
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """
+    문제 상세 조회 (정답 미포함)
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+    question = db.query(Question).filter(
+        Question.id == question_id,
+        Question.user_id == current_user.id
+    ).first()
+
+    if not question:
+        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
+
+    return question.to_dict(include_answer=False)
+
+
+@router.post("/{question_id}/submit")
+async def submit_answer(
+    question_id: int,
+    selected_answer: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """
+    답안 제출 및 채점
+
+    - **question_id**: 문제 ID
+    - **selected_answer**: 선택한 답 인덱스 (0-based)
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+    question = db.query(Question).filter(
+        Question.id == question_id,
+        Question.user_id == current_user.id
+    ).first()
+
+    if not question:
+        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
+
+    # 유효한 답인지 확인
+    if selected_answer < 0 or selected_answer >= len(question.choices or []):
+        raise HTTPException(status_code=400, detail="유효하지 않은 답입니다.")
+
+    # 정답 여부 확인
+    is_correct = selected_answer == question.correct_answer
+
+    # 오답일 경우 오류 태그 결정
+    error_type = None
+    if not is_correct and question.induced_error_tags:
+        # 선택한 답에 해당하는 오류 태그 (단순화: 첫 번째 태그 사용)
+        error_type = question.induced_error_tags[0] if question.induced_error_tags else None
+
+    # 풀이 기록 저장
+    attempt = UserQuestionAttempt(
+        user_id=current_user.id,
+        question_id=question_id,
+        selected_answer=selected_answer,
+        is_correct=is_correct,
+        error_type=error_type
+    )
+    db.add(attempt)
+    db.commit()
+
+    return {
+        "is_correct": is_correct,
+        "correct_answer": question.correct_answer,
+        "selected_answer": selected_answer,
+        "solution": question.solution,
+        "error_type": error_type
     }
