@@ -1224,8 +1224,7 @@ JSON:"""
                         "content": prompt
                     }
                 ],
-                max_completion_tokens=4000,
-                temperature=0.7
+                max_completion_tokens=4000
             )
 
             result = response.choices[0].message.content
