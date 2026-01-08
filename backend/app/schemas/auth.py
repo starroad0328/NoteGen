@@ -38,6 +38,7 @@ class UserResponse(BaseModel):
     grade: Optional[int]
     grade_display: str
     plan: str
+    ai_mode: str = "fast"  # fast 또는 quality
 
     class Config:
         from_attributes = True

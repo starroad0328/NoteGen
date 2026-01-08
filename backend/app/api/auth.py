@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.core.database import get_db
-from app.models.user import User
+from app.models.user import User, AIMode
 from app.schemas.auth import (
     UserRegister, UserLogin, Token, UserResponse, UserUpdate,
     UsageResponse, PlanInfo, PlansResponse
@@ -139,7 +139,8 @@ async def get_me(user: User = Depends(require_user)):
         school_level=user.school_level.value if user.school_level else None,
         grade=user.grade,
         grade_display=user.grade_display,
-        plan=user.plan.value
+        plan=user.plan.value,
+        ai_mode=user.ai_mode.value if user.ai_mode else "fast"
     )
 
 
@@ -172,7 +173,8 @@ async def update_me(
         school_level=user.school_level.value if user.school_level else None,
         grade=user.grade,
         grade_display=user.grade_display,
-        plan=user.plan.value
+        plan=user.plan.value,
+        ai_mode=user.ai_mode.value if user.ai_mode else "fast"
     )
 
 
@@ -294,3 +296,39 @@ async def admin_set_plan(
     db.commit()
 
     return {"message": f"User {email} plan changed to {plan}"}
+
+
+@router.get("/me/ai-mode")
+async def get_ai_mode(user: User = Depends(require_user)):
+    """AI 모드 조회"""
+    return {
+        "ai_mode": user.ai_mode.value if user.ai_mode else "fast",
+        "description": "빠른 모드 (~70초)" if user.ai_mode == AIMode.FAST else "품질 모드 (~110초)"
+    }
+
+
+@router.patch("/me/ai-mode")
+async def update_ai_mode(
+    ai_mode: str,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """AI 모드 변경"""
+    mode_map = {
+        "fast": AIMode.FAST,
+        "quality": AIMode.QUALITY,
+    }
+
+    if ai_mode not in mode_map:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid ai_mode. Use: fast, quality"
+        )
+
+    user.ai_mode = mode_map[ai_mode]
+    db.commit()
+
+    return {
+        "ai_mode": user.ai_mode.value,
+        "description": "빠른 모드 (~70초)" if user.ai_mode == AIMode.FAST else "품질 모드 (~110초)"
+    }

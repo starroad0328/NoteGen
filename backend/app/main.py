@@ -161,6 +161,14 @@ async def startup_event():
         except Exception:
             db.rollback()  # 이미 존재하면 무시
 
+        # ai_mode 컬럼 추가 (없으면) - 빠른 모드/품질 모드 선택
+        try:
+            db.execute(text("ALTER TABLE users ADD COLUMN ai_mode VARCHAR(20) DEFAULT 'fast'"))
+            db.commit()
+            print("[MIGRATION] Added ai_mode column to users table")
+        except Exception:
+            db.rollback()  # 이미 존재하면 무시
+
         # questions 테이블 생성 (없으면)
         try:
             db.execute(text("""

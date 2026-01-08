@@ -8,18 +8,28 @@ from app.models.curriculum import (
     Subject, Domain, AchievementStandard,
     CurriculumVersion,
     INITIAL_SUBJECTS,
+    # 2015 개정 - 중학교
     MATH_DOMAINS_2015_MIDDLE, MATH_STANDARDS_2015_MIDDLE,
     KOREAN_DOMAINS_2015_MIDDLE, KOREAN_STANDARDS_2015_MIDDLE,
     ENGLISH_DOMAINS_2015_MIDDLE, ENGLISH_STANDARDS_2015_MIDDLE,
     SOCIAL_DOMAINS_2015_MIDDLE, SOCIAL_STANDARDS_2015_MIDDLE,
     SCIENCE_DOMAINS_2015_MIDDLE, SCIENCE_STANDARDS_2015_MIDDLE,
-    # 고등학교 교육과정
+    # 2015 개정 - 고등학교
     MATH_DOMAINS_2015_HIGH, MATH_STANDARDS_2015_HIGH,
     KOREAN_DOMAINS_2015_HIGH, KOREAN_STANDARDS_2015_HIGH,
     ENGLISH_DOMAINS_2015_HIGH, ENGLISH_STANDARDS_2015_HIGH,
     SOCIAL_DOMAINS_2015_HIGH, SOCIAL_STANDARDS_2015_HIGH,
     SCIENCE_DOMAINS_2015_HIGH, SCIENCE_STANDARDS_2015_HIGH,
     HISTORY_DOMAINS_2015_HIGH, HISTORY_STANDARDS_2015_HIGH,
+    # 2022 개정 - 중학교
+    MATH_DOMAINS_2022_MIDDLE, MATH_STANDARDS_2022_MIDDLE,
+    KOREAN_DOMAINS_2022_MIDDLE, KOREAN_STANDARDS_2022_MIDDLE,
+    ENGLISH_DOMAINS_2022_MIDDLE, ENGLISH_STANDARDS_2022_MIDDLE,
+    # 2022 개정 - 고등학교
+    MATH_DOMAINS_2022_HIGH, MATH_STANDARDS_2022_HIGH,
+    SOCIAL_DOMAINS_2022_HIGH, SOCIAL_STANDARDS_2022_HIGH,
+    SCIENCE_DOMAINS_2022_HIGH, SCIENCE_STANDARDS_2022_HIGH,
+    HISTORY_DOMAINS_2022_HIGH, HISTORY_STANDARDS_2022_HIGH,
 )
 from app.models.user import SchoolLevel
 
@@ -99,14 +109,14 @@ def seed_math_standards(db: Session, domains: dict):
     return count
 
 
-def seed_domains(db: Session, subject: Subject, domains_data: list, school_level: SchoolLevel = SchoolLevel.MIDDLE) -> dict:
+def seed_domains(db: Session, subject: Subject, domains_data: list, school_level: SchoolLevel = SchoolLevel.MIDDLE, curriculum_version: CurriculumVersion = CurriculumVersion.V2015) -> dict:
     """범용 영역 데이터 삽입"""
     domains = {}
     for domain_data in domains_data:
         existing = db.query(Domain).filter(
             Domain.subject_id == subject.id,
             Domain.code == domain_data["code"],
-            Domain.curriculum_version == CurriculumVersion.V2015,
+            Domain.curriculum_version == curriculum_version,
             Domain.school_level == school_level
         ).first()
 
@@ -117,7 +127,7 @@ def seed_domains(db: Session, subject: Subject, domains_data: list, school_level
                 subject_id=subject.id,
                 code=domain_data["code"],
                 name=domain_data["name"],
-                curriculum_version=CurriculumVersion.V2015,
+                curriculum_version=curriculum_version,
                 school_level=school_level
             )
             db.add(domain)
@@ -252,6 +262,58 @@ def seed_curriculum(db: Session):
         print(f"[SEED] History (HIGH) domains: {len(history_domains_high)} loaded")
         history_std_high_count = seed_standards(db, history_domains_high, HISTORY_STANDARDS_2015_HIGH)
         print(f"[SEED] History (HIGH) standards: {history_std_high_count} added")
+
+    # ========== 2022 개정 교육과정 ==========
+    print("[SEED] Starting 2022 revised curriculum seed...")
+
+    # 13. 중학교 수학 (2022 개정) - 중3
+    if math_subject:
+        math_domains_2022 = seed_domains(db, math_subject, MATH_DOMAINS_2022_MIDDLE, SchoolLevel.MIDDLE, CurriculumVersion.V2022)
+        print(f"[SEED] Math (2022 MIDDLE) domains: {len(math_domains_2022)} loaded")
+        math_std_2022_count = seed_standards(db, math_domains_2022, MATH_STANDARDS_2022_MIDDLE)
+        print(f"[SEED] Math (2022 MIDDLE) standards: {math_std_2022_count} added")
+
+    # 14. 중학교 국어 (2022 개정)
+    if korean_subject:
+        korean_domains_2022 = seed_domains(db, korean_subject, KOREAN_DOMAINS_2022_MIDDLE, SchoolLevel.MIDDLE, CurriculumVersion.V2022)
+        print(f"[SEED] Korean (2022 MIDDLE) domains: {len(korean_domains_2022)} loaded")
+        korean_std_2022_count = seed_standards(db, korean_domains_2022, KOREAN_STANDARDS_2022_MIDDLE)
+        print(f"[SEED] Korean (2022 MIDDLE) standards: {korean_std_2022_count} added")
+
+    # 15. 중학교 영어 (2022 개정)
+    if english_subject:
+        english_domains_2022 = seed_domains(db, english_subject, ENGLISH_DOMAINS_2022_MIDDLE, SchoolLevel.MIDDLE, CurriculumVersion.V2022)
+        print(f"[SEED] English (2022 MIDDLE) domains: {len(english_domains_2022)} loaded")
+        english_std_2022_count = seed_standards(db, english_domains_2022, ENGLISH_STANDARDS_2022_MIDDLE)
+        print(f"[SEED] English (2022 MIDDLE) standards: {english_std_2022_count} added")
+
+    # 16. 고등학교 공통수학 (2022 개정)
+    if math_subject:
+        math_domains_2022_high = seed_domains(db, math_subject, MATH_DOMAINS_2022_HIGH, SchoolLevel.HIGH, CurriculumVersion.V2022)
+        print(f"[SEED] Math (2022 HIGH) domains: {len(math_domains_2022_high)} loaded")
+        math_std_2022_high_count = seed_standards(db, math_domains_2022_high, MATH_STANDARDS_2022_HIGH)
+        print(f"[SEED] Math (2022 HIGH) standards: {math_std_2022_high_count} added")
+
+    # 17. 고등학교 통합사회 (2022 개정)
+    if social_subject:
+        social_domains_2022_high = seed_domains(db, social_subject, SOCIAL_DOMAINS_2022_HIGH, SchoolLevel.HIGH, CurriculumVersion.V2022)
+        print(f"[SEED] Social (2022 HIGH) domains: {len(social_domains_2022_high)} loaded")
+        social_std_2022_high_count = seed_standards(db, social_domains_2022_high, SOCIAL_STANDARDS_2022_HIGH)
+        print(f"[SEED] Social (2022 HIGH) standards: {social_std_2022_high_count} added")
+
+    # 18. 고등학교 통합과학 (2022 개정)
+    if science_subject:
+        science_domains_2022_high = seed_domains(db, science_subject, SCIENCE_DOMAINS_2022_HIGH, SchoolLevel.HIGH, CurriculumVersion.V2022)
+        print(f"[SEED] Science (2022 HIGH) domains: {len(science_domains_2022_high)} loaded")
+        science_std_2022_high_count = seed_standards(db, science_domains_2022_high, SCIENCE_STANDARDS_2022_HIGH)
+        print(f"[SEED] Science (2022 HIGH) standards: {science_std_2022_high_count} added")
+
+    # 19. 고등학교 한국사 (2022 개정)
+    if history_subject:
+        history_domains_2022_high = seed_domains(db, history_subject, HISTORY_DOMAINS_2022_HIGH, SchoolLevel.HIGH, CurriculumVersion.V2022)
+        print(f"[SEED] History (2022 HIGH) domains: {len(history_domains_2022_high)} loaded")
+        history_std_2022_high_count = seed_standards(db, history_domains_2022_high, HISTORY_STANDARDS_2022_HIGH)
+        print(f"[SEED] History (2022 HIGH) standards: {history_std_2022_high_count} added")
 
     db.commit()
     print("[SEED] Curriculum seed complete!")

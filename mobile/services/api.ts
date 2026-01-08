@@ -38,6 +38,8 @@ export interface Note {
   detected_note_type?: string  // AI 감지 노트 타입
 }
 
+export type AIMode = 'fast' | 'quality'
+
 export interface User {
   id: number
   email: string
@@ -46,6 +48,7 @@ export interface User {
   grade?: number
   grade_display: string
   plan: string
+  ai_mode: AIMode  // fast (~70초) 또는 quality (~110초)
 }
 
 export interface AuthResponse {
@@ -308,6 +311,23 @@ export const authAPI = {
 
   getPlans: async (token: string): Promise<PlansResponse> => {
     const response = await apiClient.get('/api/auth/plans', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  // AI 모드 조회
+  getAIMode: async (token: string): Promise<{ ai_mode: AIMode; description: string }> => {
+    const response = await apiClient.get('/api/auth/me/ai-mode', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return response.data
+  },
+
+  // AI 모드 변경
+  updateAIMode: async (token: string, mode: AIMode): Promise<{ ai_mode: AIMode; description: string }> => {
+    const response = await apiClient.patch('/api/auth/me/ai-mode', null, {
+      params: { ai_mode: mode },
       headers: { Authorization: `Bearer ${token}` },
     })
     return response.data

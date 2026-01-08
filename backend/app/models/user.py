@@ -25,6 +25,12 @@ class AIModel(str, enum.Enum):
     GPT_5_2 = "gpt-5.2"  # 유료 Pro 옵션 2 (최고급)
 
 
+class AIMode(str, enum.Enum):
+    """AI 처리 모드"""
+    FAST = "fast"        # 빠른 모드 (GPT-5-mini, ~70초)
+    QUALITY = "quality"  # 품질 모드 (플랜별 최고 모델, ~110초)
+
+
 class SchoolLevel(str, enum.Enum):
     """학교급"""
     MIDDLE = "middle"  # 중학교
@@ -55,6 +61,12 @@ class User(Base):
     preferred_ai_model = Column(
         Enum(AIModel),
         default=AIModel.GPT_5_MINI
+    )
+
+    # AI 처리 모드 (빠른/품질)
+    ai_mode = Column(
+        Enum(AIMode),
+        default=AIMode.FAST  # 기본값: 빠른 모드
     )
 
     # 활성 상태
@@ -88,7 +100,12 @@ class User(Base):
             return [AIModel.GPT_5_MINI, AIModel.GPT_5, AIModel.GPT_5_2]
 
     def get_default_model(self) -> 'AIModel':
-        """플랜별 기본 AI 모델 반환"""
+        """AI 모드 및 플랜에 따른 기본 AI 모델 반환"""
+        # 빠른 모드면 모든 플랜에서 mini 사용 (~70초)
+        if self.ai_mode == AIMode.FAST:
+            return AIModel.GPT_5_MINI
+
+        # 품질 모드면 플랜별 최고 모델 사용 (~110초)
         if self.plan == UserPlan.FREE:
             return AIModel.GPT_5_MINI  # 무료: gpt-5-mini
         elif self.plan == UserPlan.BASIC:
