@@ -63,11 +63,12 @@ class User(Base):
         default=AIModel.GPT_5_MINI
     )
 
-    # AI 처리 모드 (빠른/품질) - DB 마이그레이션 후 활성화
-    # ai_mode = Column(
-    #     Enum(AIMode),
-    #     default=AIMode.FAST  # 기본값: 빠른 모드
-    # )
+    # AI 처리 모드 (빠른/품질)
+    ai_mode = Column(
+        Enum(AIMode),
+        default=AIMode.FAST,  # 기본값: 빠른 모드
+        nullable=True  # DB 마이그레이션 호환성
+    )
 
     # 활성 상태
     is_active = Column(Boolean, default=True)
@@ -101,19 +102,18 @@ class User(Base):
 
     def get_default_model(self) -> 'AIModel':
         """AI 모드 및 플랜에 따른 기본 AI 모델 반환"""
-        # 임시: 빠른 모드 고정 (DB 마이그레이션 전까지)
-        # TODO: ai_mode 컬럼 추가 후 아래 로직 활성화
-        return AIModel.GPT_5_MINI  # 빠른 모드 (~70초)
+        # 빠른 모드면 모든 플랜에서 mini 사용 (~70초)
+        # ai_mode가 None이거나 FAST면 빠른 모드
+        if not self.ai_mode or self.ai_mode == AIMode.FAST:
+            return AIModel.GPT_5_MINI
 
-        # ai_mode 활성화 후:
-        # if self.ai_mode == AIMode.FAST:
-        #     return AIModel.GPT_5_MINI
-        # if self.plan == UserPlan.FREE:
-        #     return AIModel.GPT_5_MINI
-        # elif self.plan == UserPlan.BASIC:
-        #     return AIModel.GPT_5
-        # else:  # PRO
-        #     return AIModel.GPT_5_2
+        # 품질 모드면 플랜별 최고 모델 사용 (~110초)
+        if self.plan == UserPlan.FREE:
+            return AIModel.GPT_5_MINI  # 무료: gpt-5-mini
+        elif self.plan == UserPlan.BASIC:
+            return AIModel.GPT_5  # 베이직: gpt-5
+        else:  # PRO
+            return AIModel.GPT_5_2  # 프로: gpt-5.2
 
     def can_use_model(self, model: AIModel) -> bool:
         """특정 모델 사용 가능 여부 확인"""
