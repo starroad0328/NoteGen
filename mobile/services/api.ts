@@ -184,7 +184,9 @@ export const processAPI = {
   },
 
   getStatus: async (noteId: number): Promise<ProcessResponse> => {
-    const response = await apiClient.get(`/api/process/${noteId}/status`)
+    const response = await apiClient.get(`/api/process/${noteId}/status`, {
+      timeout: 15000  // 15초 timeout (기본 30초보다 짧게)
+    })
     return response.data
   },
 

@@ -4,8 +4,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { processAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
-const MAX_RETRIES = 5
-const BASE_DELAY = 800  // 0.8초로 줄임
+const MAX_RETRIES = 10  // 네트워크 불안정 대비 재시도 횟수 증가
+const BASE_DELAY = 1500  // 1.5초 간격
 
 export default function ProcessingScreen() {
   const router = useRouter()
@@ -133,6 +133,7 @@ export default function ProcessingScreen() {
 
         retryCount++
         console.log(`[Polling] 에러 ${retryCount}/${MAX_RETRIES}:`, err?.message)
+        console.log(`[Polling] 에러 코드:`, err?.code, '상태:', err?.response?.status)
 
         if (retryCount >= MAX_RETRIES) {
           // 최대 재시도 초과
