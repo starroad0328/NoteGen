@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Alert } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { uploadAPI, authAPI, templatesAPI, UsageInfo, OrganizeTemplate } from '../../services/api'
+import { uploadAPI, authAPI, templatesAPI, UsageInfo, OrganizeTemplate, AIMode } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -19,6 +19,7 @@ export default function HomeTab() {
   const [uploading, setUploading] = useState(false)
   const [usage, setUsage] = useState<UsageInfo | null>(null)
   const [subscribedTemplates, setSubscribedTemplates] = useState<OrganizeTemplate[]>([])
+  const [aiMode, setAiMode] = useState<AIMode>('fast')
 
   // 기본 정리법 (항상 표시)
   const defaultMethods = [
@@ -36,9 +37,24 @@ export default function HomeTab() {
         templatesAPI.getSubscribed(token)
           .then(result => setSubscribedTemplates(result.templates))
           .catch(console.error)
+        // AI 모드 불러오기
+        authAPI.getAIMode(token)
+          .then(result => setAiMode(result.ai_mode))
+          .catch(console.error)
       }
     }, [token])
   )
+
+  // AI 모드 변경
+  const handleAIModeChange = async (mode: AIMode) => {
+    if (!token) return
+    setAiMode(mode)
+    try {
+      await authAPI.updateAIMode(token, mode)
+    } catch (error) {
+      console.error('AI 모드 변경 실패:', error)
+    }
+  }
 
   const takePhoto = async () => {
     if (!user) {
@@ -230,6 +246,39 @@ export default function HomeTab() {
             </>
           )}
         </View>
+
+        {/* AI 모드 선택 */}
+        {user && (
+          <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>AI 모드</Text>
+            <View style={styles.aiModeRow}>
+              <TouchableOpacity
+                style={[
+                  styles.aiModeButton,
+                  { borderColor: colors.tabBarBorder },
+                  aiMode === 'fast' && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
+                ]}
+                onPress={() => handleAIModeChange('fast')}
+              >
+                <Text style={[styles.aiModeIcon]}>⚡</Text>
+                <Text style={[styles.aiModeLabel, { color: colors.text }]}>빠른 모드</Text>
+                <Text style={[styles.aiModeTime, { color: colors.textLight }]}>~70초</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.aiModeButton,
+                  { borderColor: colors.tabBarBorder },
+                  aiMode === 'quality' && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
+                ]}
+                onPress={() => handleAIModeChange('quality')}
+              >
+                <Text style={[styles.aiModeIcon]}>✨</Text>
+                <Text style={[styles.aiModeLabel, { color: colors.text }]}>품질 모드</Text>
+                <Text style={[styles.aiModeTime, { color: colors.textLight }]}>~110초</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* 정리 시작 버튼 */}
         <TouchableOpacity
@@ -426,5 +475,29 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  // AI 모드 선택
+  aiModeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  aiModeButton: {
+    flex: 1,
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  aiModeIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  aiModeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  aiModeTime: {
+    fontSize: 12,
+    marginTop: 2,
   },
 })
