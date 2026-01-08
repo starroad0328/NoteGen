@@ -132,6 +132,12 @@ async def login(data: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(require_user)):
     """현재 사용자 정보"""
+    # ai_mode 안전하게 가져오기 (DB 마이그레이션 전 호환성)
+    try:
+        ai_mode_value = user.ai_mode.value if user.ai_mode else "fast"
+    except Exception:
+        ai_mode_value = "fast"
+
     return UserResponse(
         id=user.id,
         email=user.email,
@@ -140,7 +146,7 @@ async def get_me(user: User = Depends(require_user)):
         grade=user.grade,
         grade_display=user.grade_display,
         plan=user.plan.value,
-        ai_mode=user.ai_mode.value if user.ai_mode else "fast"
+        ai_mode=ai_mode_value
     )
 
 
@@ -166,6 +172,12 @@ async def update_me(
     db.commit()
     db.refresh(user)
 
+    # ai_mode 안전하게 가져오기
+    try:
+        ai_mode_value = user.ai_mode.value if user.ai_mode else "fast"
+    except Exception:
+        ai_mode_value = "fast"
+
     return UserResponse(
         id=user.id,
         email=user.email,
@@ -174,7 +186,7 @@ async def update_me(
         grade=user.grade,
         grade_display=user.grade_display,
         plan=user.plan.value,
-        ai_mode=user.ai_mode.value if user.ai_mode else "fast"
+        ai_mode=ai_mode_value
     )
 
 
@@ -301,9 +313,16 @@ async def admin_set_plan(
 @router.get("/me/ai-mode")
 async def get_ai_mode(user: User = Depends(require_user)):
     """AI 모드 조회"""
+    try:
+        ai_mode_value = user.ai_mode.value if user.ai_mode else "fast"
+        is_fast = user.ai_mode == AIMode.FAST if user.ai_mode else True
+    except Exception:
+        ai_mode_value = "fast"
+        is_fast = True
+
     return {
-        "ai_mode": user.ai_mode.value if user.ai_mode else "fast",
-        "description": "빠른 모드 (~70초)" if user.ai_mode == AIMode.FAST else "품질 모드 (~110초)"
+        "ai_mode": ai_mode_value,
+        "description": "빠른 모드 (~70초)" if is_fast else "품질 모드 (~110초)"
     }
 
 
