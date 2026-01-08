@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.core.database import get_db
-from app.models.user import User, AIMode
+from app.models.user import User
 from app.schemas.auth import (
     UserRegister, UserLogin, Token, UserResponse, UserUpdate,
     UsageResponse, PlanInfo, PlansResponse
@@ -132,12 +132,6 @@ async def login(data: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(require_user)):
     """현재 사용자 정보"""
-    # ai_mode 안전하게 가져오기 (DB 마이그레이션 전 호환성)
-    try:
-        ai_mode_value = user.ai_mode.value if user.ai_mode else "fast"
-    except Exception:
-        ai_mode_value = "fast"
-
     return UserResponse(
         id=user.id,
         email=user.email,
@@ -146,7 +140,7 @@ async def get_me(user: User = Depends(require_user)):
         grade=user.grade,
         grade_display=user.grade_display,
         plan=user.plan.value,
-        ai_mode=ai_mode_value
+        ai_mode="fast"  # 임시: 빠른 모드 고정
     )
 
 
@@ -172,12 +166,6 @@ async def update_me(
     db.commit()
     db.refresh(user)
 
-    # ai_mode 안전하게 가져오기
-    try:
-        ai_mode_value = user.ai_mode.value if user.ai_mode else "fast"
-    except Exception:
-        ai_mode_value = "fast"
-
     return UserResponse(
         id=user.id,
         email=user.email,
@@ -186,7 +174,7 @@ async def update_me(
         grade=user.grade,
         grade_display=user.grade_display,
         plan=user.plan.value,
-        ai_mode=ai_mode_value
+        ai_mode="fast"  # 임시: 빠른 모드 고정
     )
 
 
@@ -312,17 +300,10 @@ async def admin_set_plan(
 
 @router.get("/me/ai-mode")
 async def get_ai_mode(user: User = Depends(require_user)):
-    """AI 모드 조회"""
-    try:
-        ai_mode_value = user.ai_mode.value if user.ai_mode else "fast"
-        is_fast = user.ai_mode == AIMode.FAST if user.ai_mode else True
-    except Exception:
-        ai_mode_value = "fast"
-        is_fast = True
-
+    """AI 모드 조회 - 임시: 빠른 모드 고정"""
     return {
-        "ai_mode": ai_mode_value,
-        "description": "빠른 모드 (~70초)" if is_fast else "품질 모드 (~110초)"
+        "ai_mode": "fast",
+        "description": "빠른 모드 (~70초)"
     }
 
 
@@ -332,22 +313,9 @@ async def update_ai_mode(
     user: User = Depends(require_user),
     db: Session = Depends(get_db)
 ):
-    """AI 모드 변경"""
-    mode_map = {
-        "fast": AIMode.FAST,
-        "quality": AIMode.QUALITY,
-    }
-
-    if ai_mode not in mode_map:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid ai_mode. Use: fast, quality"
-        )
-
-    user.ai_mode = mode_map[ai_mode]
-    db.commit()
-
+    """AI 모드 변경 - 임시: 빠른 모드 고정 (DB 마이그레이션 후 활성화)"""
+    # TODO: DB 마이그레이션 후 실제 저장 로직 활성화
     return {
-        "ai_mode": user.ai_mode.value,
-        "description": "빠른 모드 (~70초)" if user.ai_mode == AIMode.FAST else "품질 모드 (~110초)"
+        "ai_mode": "fast",
+        "description": "빠른 모드 (~70초) - 현재 빠른 모드만 지원"
     }
