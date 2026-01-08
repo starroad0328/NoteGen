@@ -5,7 +5,7 @@ AI 기반 노트 정리 서비스 (3단계 처리 + 블록 압축 + 교육과정
 
 import json
 from typing import Optional, Dict, List
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.core.config import settings
 from app.core.curriculum import get_curriculum_context, detect_subject
 from app.models.note import OrganizeMethod, NoteType, Subject
@@ -21,7 +21,7 @@ class AIService:
     PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self._prompt_cache: Dict[str, str] = {}
 
     def _load_prompt(self, prompt_name: str) -> Optional[str]:
@@ -294,7 +294,7 @@ class AIService:
 
 [정제된 텍스트]"""
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=ai_model.value,
             messages=[
                 {
@@ -395,7 +395,7 @@ class AIService:
 
         print("[AI] _step1 API 호출 직전", flush=True)
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=ai_model.value,
             messages=[
                 {
@@ -530,7 +530,7 @@ class AIService:
 
             print(f"[AI] Using template prompt ({len(template_prompt)} chars)", flush=True)
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=ai_model.value,
                 messages=[
                     {"role": "system", "content": system_message},
@@ -637,7 +637,7 @@ class AIService:
 {content}
 """
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=ai_model.value,
             messages=[
                 {
@@ -759,7 +759,7 @@ class AIService:
 JSON:"""
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-5-mini-2025-08-07",  # 취약 개념 추출용
                 messages=[
                     {
@@ -891,7 +891,7 @@ JSON:"""
 JSON:"""
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-5-mini-2025-08-07",
                 messages=[
                     {
@@ -1035,7 +1035,7 @@ JSON:"""
             model = "gpt-5-mini-2025-08-07"
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -1101,7 +1101,7 @@ JSON:"""
         print(f"[AI] 역사 문제 생성 시작 - 카드: {concept_card.get('title', 'Unknown')}, 문제 수: {question_count}", flush=True)
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=ai_model.value,
                 messages=[
                     {
@@ -1212,7 +1212,7 @@ JSON:"""
         print(f"[AI] 노트 기반 역사 문제 생성 시작 - 문제 수: {question_count}", flush=True)
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=ai_model.value,
                 messages=[
                     {
