@@ -68,7 +68,7 @@ class AIService:
 
         # 0단계: OCR 정제
         print("[AI] Detect - 0단계: OCR 정제...", flush=True)
-        refined_text = await self._step0_refine_ocr(ocr_text, AIModel.GPT_5_NANO)
+        refined_text = await self._step0_refine_ocr(ocr_text, AIModel.GPT_5_MINI)
 
         # 1단계: 구조 파악
         print("[AI] Detect - 1단계: 구조 분석...", flush=True)
@@ -182,7 +182,7 @@ class AIService:
             if on_step:
                 await on_step(0, "OCR 텍스트 정제 중...")
 
-            refined_text = await self._step0_refine_ocr(ocr_text, AIModel.GPT_5_NANO)
+            refined_text = await self._step0_refine_ocr(ocr_text, AIModel.GPT_5_MINI)
 
             print(f"[AI] 0단계 완료. 정제 텍스트 길이: {len(refined_text)}", flush=True)
 
