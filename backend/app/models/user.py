@@ -63,11 +63,11 @@ class User(Base):
         default=AIModel.GPT_5_MINI
     )
 
-    # AI 처리 모드 (빠른/품질)
+    # AI 처리 모드 (빠른/품질) - VARCHAR로 저장 (DB 호환성)
     ai_mode = Column(
-        Enum(AIMode),
-        default=AIMode.FAST,  # 기본값: 빠른 모드
-        nullable=True  # DB 마이그레이션 호환성
+        String(20),
+        default="fast",  # 기본값: 빠른 모드
+        nullable=True
     )
 
     # 활성 상태
@@ -103,11 +103,11 @@ class User(Base):
     def get_default_model(self) -> 'AIModel':
         """AI 모드 및 플랜에 따른 기본 AI 모델 반환"""
         # 빠른 모드면 모든 플랜에서 mini 사용 (~70초)
-        # ai_mode가 None이거나 FAST면 빠른 모드
-        if not self.ai_mode or self.ai_mode == AIMode.FAST:
+        # ai_mode가 None이거나 "fast"면 빠른 모드
+        if not self.ai_mode or self.ai_mode == "fast":
             return AIModel.GPT_5_MINI
 
-        # 품질 모드면 플랜별 최고 모델 사용 (~110초)
+        # 품질 모드 ("quality")면 플랜별 최고 모델 사용 (~110초)
         if self.plan == UserPlan.FREE:
             return AIModel.GPT_5_MINI  # 무료: gpt-5-mini
         elif self.plan == UserPlan.BASIC:
