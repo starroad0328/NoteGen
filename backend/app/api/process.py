@@ -109,7 +109,7 @@ async def process_note_pipeline(note_id: int):
                 school_level = user.school_level
                 grade = user.grade
                 ai_model = user.get_default_model()
-                debug_log(note_id, f"User: {user.grade_display}, plan={user.plan.value}")
+                debug_log(note_id, f"User: {user.grade_display}, plan={user.plan.value}, ai_mode={user.ai_mode}, model={ai_model.value}")
 
         # 정리법 템플릿 조회
         template_prompt = None
