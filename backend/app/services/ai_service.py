@@ -144,11 +144,10 @@ class AIService:
         grade: Optional[int] = None
     ) -> Dict:
         """
-        필기 텍스트를 3단계로 정리
+        필기 텍스트를 2단계로 정리 (최적화됨)
 
         0단계: OCR 정제 (띄어쓰기, 오타)
-        1단계: 구조 파악 + 과목/노트타입 감지
-        2단계: 타입별 프롬프트로 정리 생성
+        1+2단계 통합: 구조 파악 + 콘텐츠 생성 (1회 API 호출)
 
         Args:
             ocr_text: OCR로 추출한 텍스트
@@ -177,7 +176,7 @@ class AIService:
         blocks_data = self._get_blocks_for_llm(ocr_metadata) if ocr_metadata else None
 
         try:
-            # 0단계: OCR 정제 (렌즈급 텍스트 복원) - 항상 nano 사용
+            # 0단계: OCR 정제
             print("[AI] 0단계: OCR 정제 시작...", flush=True)
             if on_step:
                 await on_step(0, "OCR 텍스트 정제 중...")
@@ -186,46 +185,47 @@ class AIService:
 
             print(f"[AI] 0단계 완료. 정제 텍스트 길이: {len(refined_text)}", flush=True)
 
-            # 1단계: 구조 파악 + 과목/노트타입 감지
-            print("[AI] 1단계 시작...", flush=True)
-            if on_step:
-                await on_step(1, "필기 구조 분석 중...")
-
-            # 교육과정 컨텍스트 생성 (1단계에서도 활용)
+            # 교육과정 컨텍스트 생성
             curriculum_context = get_curriculum_context(school_level, grade)
 
-            analysis_result = await self._step1_analyze_structure(
-                blocks_data, refined_text, ai_model, school_level, grade, curriculum_context
-            )
+            # 오답노트/단어장은 기존 3단계 로직 사용 (특수 프롬프트 필요)
+            if method in [OrganizeMethod.ERROR_NOTE, OrganizeMethod.VOCAB]:
+                return await self._organize_note_legacy(
+                    refined_text, blocks_data, method, ai_model, on_step,
+                    school_level, grade, curriculum_context
+                )
 
-            # 감지된 과목/노트타입/단원 추출
-            detected_subject = analysis_result.get("subject", "other")
-            detected_note_type = analysis_result.get("note_type", "general")
-            detected_unit = analysis_result.get("detected_unit", "")
-            structure_text = analysis_result.get("structure", "")
-
-            print(f"[AI] 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}, 단원={detected_unit}", flush=True)
-
-            # 2단계: 타입별 프롬프트로 정리 생성
-            print("[AI] 2단계 시작...", flush=True)
+            # 1+2단계 통합: 구조 분석 + 콘텐츠 생성 (최적화)
+            print("[AI] 1+2단계 통합: 분석 및 정리 시작...", flush=True)
             if on_step:
-                # 노트 타입에 따른 메시지 표시
-                type_msg = {
-                    "error_note": "오답노트 형식으로 정리 중...",
-                    "vocab": "단어장 형식으로 정리 중...",
-                    "general": "AI 정리 생성 중..."
-                }
-                await on_step(2, type_msg.get(detected_note_type, "AI 정리 생성 중..."))
+                await on_step(1, "필기 분석 및 정리 중...")
 
-            if curriculum_context:
-                print(f"[AI] 교육과정 컨텍스트 적용: {school_level.value if school_level else ''} {grade}학년", flush=True)
-
-            organized = await self._step2_organize_with_structure(
-                blocks_data, refined_text, structure_text, method, ai_model, curriculum_context,
-                detected_subject, detected_note_type
+            result = await self._step1_analyze_and_organize(
+                blocks_data, refined_text, method, ai_model,
+                school_level, grade, curriculum_context
             )
 
-            print(f"[AI] 2단계 완료. 결과 길이: {len(organized)}", flush=True)
+            detected_subject = result.get("subject", "other")
+            detected_note_type = result.get("note_type", "general")
+            detected_unit = result.get("detected_unit", "")
+            organized = result.get("content", refined_text)
+
+            print(f"[AI] 1+2단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
+
+            # 감지된 타입이 오답노트/단어장이면 재처리 (정확도 향상)
+            if detected_note_type in ["error_note", "vocab"] and method not in [OrganizeMethod.ERROR_NOTE, OrganizeMethod.VOCAB]:
+                print(f"[AI] 특수 타입 감지됨, 전용 프롬프트로 재처리: {detected_note_type}", flush=True)
+                if on_step:
+                    type_msg = {
+                        "error_note": "오답노트 형식으로 재정리 중...",
+                        "vocab": "단어장 형식으로 재정리 중..."
+                    }
+                    await on_step(2, type_msg.get(detected_note_type, "재정리 중..."))
+
+                organized = await self._step2_organize_with_structure(
+                    blocks_data, refined_text, "", method, ai_model, curriculum_context,
+                    detected_subject, detected_note_type
+                )
 
             return {
                 "content": organized,
@@ -237,6 +237,61 @@ class AIService:
         except Exception as e:
             print(f"[AI] 에러 발생: {str(e)}", flush=True)
             raise Exception(f"AI 정리 중 오류 발생: {str(e)}")
+
+    async def _organize_note_legacy(
+        self,
+        refined_text: str,
+        blocks_data: Optional[Dict],
+        method: OrganizeMethod,
+        ai_model: AIModel,
+        on_step: Optional[callable],
+        school_level: Optional[SchoolLevel],
+        grade: Optional[int],
+        curriculum_context: str
+    ) -> Dict:
+        """
+        기존 3단계 로직 (오답노트/단어장용)
+        특수 프롬프트가 필요한 경우 사용
+        """
+        # 1단계: 구조 파악
+        print("[AI] Legacy 1단계: 구조 분석...", flush=True)
+        if on_step:
+            await on_step(1, "필기 구조 분석 중...")
+
+        analysis_result = await self._step1_analyze_structure(
+            blocks_data, refined_text, ai_model, school_level, grade, curriculum_context
+        )
+
+        detected_subject = analysis_result.get("subject", "other")
+        detected_note_type = analysis_result.get("note_type", "general")
+        detected_unit = analysis_result.get("detected_unit", "")
+        structure_text = analysis_result.get("structure", "")
+
+        print(f"[AI] Legacy 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
+
+        # 2단계: 타입별 프롬프트로 정리 생성
+        print("[AI] Legacy 2단계: 콘텐츠 생성...", flush=True)
+        if on_step:
+            type_msg = {
+                "error_note": "오답노트 형식으로 정리 중...",
+                "vocab": "단어장 형식으로 정리 중...",
+                "general": "AI 정리 생성 중..."
+            }
+            await on_step(2, type_msg.get(detected_note_type, "AI 정리 생성 중..."))
+
+        organized = await self._step2_organize_with_structure(
+            blocks_data, refined_text, structure_text, method, ai_model, curriculum_context,
+            detected_subject, detected_note_type
+        )
+
+        print(f"[AI] Legacy 2단계 완료. 결과 길이: {len(organized)}", flush=True)
+
+        return {
+            "content": organized,
+            "detected_subject": detected_subject,
+            "detected_note_type": detected_note_type,
+            "detected_unit": detected_unit
+        }
 
     def _get_blocks_for_llm(self, metadata: Dict) -> Optional[Dict]:
         """LLM 전달용 압축 블록 데이터 추출"""
@@ -327,6 +382,174 @@ class AIService:
             lines.append(f"[{block['id']}] (y:{bbox[1]}) {block['text']}")
 
         return "\n".join(lines)
+
+    async def _step1_analyze_and_organize(
+        self,
+        blocks_data: Optional[Dict],
+        ocr_text: str,
+        method: OrganizeMethod,
+        ai_model: AIModel,
+        school_level: Optional[SchoolLevel] = None,
+        grade: Optional[int] = None,
+        curriculum_context: str = ""
+    ) -> Dict:
+        """
+        Step 1+2 통합: 구조 분석 + 콘텐츠 생성을 한 번에
+        API 호출 1회로 과목/타입 감지와 정리된 콘텐츠 모두 생성
+
+        Returns:
+            Dict: {
+                "subject": "감지된 과목",
+                "note_type": "감지된 노트 타입",
+                "detected_unit": "감지된 단원",
+                "content": "정리된 마크다운 콘텐츠"
+            }
+        """
+        # 블록 데이터 사용 (토큰 절약)
+        if blocks_data:
+            content = self._format_blocks_for_prompt(blocks_data)
+            input_desc = f"(블록 {len(blocks_data['blocks'])}개)"
+        else:
+            content = ocr_text
+            input_desc = "(원본 텍스트)"
+
+        # 학년 정보 섹션 생성
+        grade_info = ""
+        if school_level and grade:
+            level_name = "중학교" if school_level == SchoolLevel.MIDDLE else "고등학교"
+            grade_info = f"\n[학습자 정보]\n{level_name} {grade}학년 학생의 필기입니다.\n"
+
+        # 교육과정 컨텍스트
+        curriculum_section = f"\n{curriculum_context}\n" if curriculum_context else ""
+
+        # 정리 형식 지시사항 (method에 따라)
+        if method == OrganizeMethod.CORNELL:
+            format_instruction = """[정리 형식 - 코넬식]
+content 필드에 아래 JSON 형식의 코넬식 노트를 문자열로 넣으세요:
+{
+  "title": "제목",
+  "cues": ["키워드1", "키워드2"],
+  "main": [
+    {"type": "heading", "level": 2, "content": "소제목"},
+    {"type": "paragraph", "content": "설명"},
+    {"type": "bullet", "items": ["항목1", "항목2"]},
+    {"type": "important", "content": "중요 개념"}
+  ],
+  "summary": "전체 요약 1-2문장"
+}"""
+        else:
+            format_instruction = """[정리 형식 - 기본 요약]
+content 필드에 마크다운 형식으로 정리:
+# 제목 (내용 기반 자동 생성)
+
+## 소제목1
+- 핵심 내용
+- 세부 내용
+
+## 소제목2
+- 핵심 내용
+
+[규칙]
+- 관련 내용은 같은 섹션으로 묶기
+- 시대/국가/주제가 같으면 통합
+- 논리적 연결 우선"""
+
+        prompt = f"""다음 필기를 분석하고 정리해주세요. {input_desc}
+{grade_info}{curriculum_section}
+[1단계: 분석]
+- 과목 감지: math, english, korean, history, social, science, other
+- 노트 타입: general(일반필기), error_note(오답노트), vocab(단어장)
+- 단원 감지: 교육과정 기반
+
+[노트 타입 판단 기준]
+- error_note: "문제", "풀이", "정답", "오답", "해설" 포함
+- vocab: 영어 단어 + 뜻/예문 형태
+- general: 그 외 일반 필기
+
+[2단계: 정리]
+{format_instruction}
+
+[필수 규칙]
+- 블록ID, 좌표 등 메타데이터 출력 금지 ([bX], y:XX 등)
+- 깔끔한 마크다운으로 정리
+- 원본 내용 기반으로 정리
+
+[출력 형식 - 반드시 JSON]
+```json
+{{
+  "subject": "math|english|korean|history|social|science|other",
+  "note_type": "general|error_note|vocab",
+  "detected_unit": "감지된 단원명",
+  "content": "정리된 콘텐츠 (마크다운 또는 코넬식 JSON 문자열)"
+}}
+```
+
+[필기 내용]
+{content}
+"""
+
+        print("[AI] Step 1+2 통합 API 호출...", flush=True)
+
+        response = await self.client.chat.completions.create(
+            model=ai_model.value,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "학생 필기 분석 및 정리 전문가. 메타데이터 제거. JSON 형식으로만 응답."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_completion_tokens=8000
+        )
+
+        print(f"[AI] Step 1+2 API 완료, finish_reason: {response.choices[0].finish_reason}", flush=True)
+
+        result = response.choices[0].message.content
+        if not result or not result.strip():
+            if response.choices[0].finish_reason == "length":
+                raise Exception("통합 단계 토큰 한도 초과")
+            return {
+                "subject": "other",
+                "note_type": "general",
+                "detected_unit": "",
+                "content": ocr_text
+            }
+
+        # JSON 파싱
+        try:
+            json_str = result.strip()
+            if "```json" in json_str:
+                json_str = json_str.split("```json")[1].split("```")[0].strip()
+            elif "```" in json_str:
+                json_str = json_str.split("```")[1].split("```")[0].strip()
+
+            parsed = json.loads(json_str)
+
+            # 코넬식일 때 content가 JSON 문자열이면 검증
+            if method == OrganizeMethod.CORNELL and parsed.get("content"):
+                content_val = parsed["content"]
+                if isinstance(content_val, str) and content_val.startswith("{"):
+                    try:
+                        cornell_json = json.loads(content_val)
+                        if all(key in cornell_json for key in ["title", "cues", "main", "summary"]):
+                            parsed["content"] = json.dumps(cornell_json, ensure_ascii=False)
+                    except:
+                        pass
+
+            print(f"[AI] Step 1+2 완료: subject={parsed.get('subject')}, type={parsed.get('note_type')}", flush=True)
+            return parsed
+
+        except json.JSONDecodeError as e:
+            print(f"[AI] Step 1+2 JSON 파싱 실패: {e}", flush=True)
+            return {
+                "subject": "other",
+                "note_type": "general",
+                "detected_unit": "",
+                "content": result
+            }
 
     async def _step1_analyze_structure(
         self,
