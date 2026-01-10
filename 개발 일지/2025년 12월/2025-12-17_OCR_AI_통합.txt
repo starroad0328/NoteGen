@@ -35,8 +35,8 @@
   ✓ Secret Key 및 Invoke URL 발급
   ✓ backend/.env에 API 키 설정
 
-  Secret Key: TWViRndSS2JqYXlvcXlnUmNQSmpKV1pXcGZSeFpkSHk=
-  Invoke URL: https://b60e9mk9yr.apigw.ntruss.com/custom/v1/.../general
+  Secret Key: [REDACTED - .env 참조]
+  Invoke URL: [REDACTED - .env 참조]
 
 [ 구현 내용 ]
 
