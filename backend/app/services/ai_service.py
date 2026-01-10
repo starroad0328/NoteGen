@@ -212,20 +212,8 @@ class AIService:
 
             print(f"[AI] 1+2단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
 
-            # 감지된 타입이 오답노트/단어장이면 재처리 (정확도 향상)
-            if detected_note_type in ["error_note", "vocab"] and method not in [OrganizeMethod.ERROR_NOTE, OrganizeMethod.VOCAB]:
-                print(f"[AI] 특수 타입 감지됨, 전용 프롬프트로 재처리: {detected_note_type}", flush=True)
-                if on_step:
-                    type_msg = {
-                        "error_note": "오답노트 형식으로 재정리 중...",
-                        "vocab": "단어장 형식으로 재정리 중..."
-                    }
-                    await on_step(2, type_msg.get(detected_note_type, "재정리 중..."))
-
-                organized = await self._step2_organize_with_structure(
-                    blocks_data, refined_text, "", method, ai_model, curriculum_context,
-                    detected_subject, detected_note_type
-                )
+            # 재처리 제거 - 통합 단계에서 이미 처리됨
+            # 오답노트/단어장도 통합 단계에서 감지 후 적절히 정리됨
 
             return {
                 "content": organized,
