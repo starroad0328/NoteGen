@@ -54,12 +54,10 @@ def generate_note_title(subject: str, unit: str = "") -> str:
 
 async def process_note_pipeline(note_id: int):
     """
-    노트 처리 파이프라인 (2단계 분리)
+    노트 처리 파이프라인 (최적화된 2단계)
     1. OCR 처리
-    2. AI Step 0+1: 구조 파악 + 노트 타입 감지
-    3. 확인 필요 여부 체크 (오답노트 감지 + 다른 방식 선택)
-    4. AI Step 2: 콘텐츠 생성
-    5. 결과 저장
+    2. AI 통합 처리 (Step 0 + Step 1+2)
+    3. 결과 저장
     """
     from app.core.database import SessionLocal
     db = SessionLocal()
@@ -93,9 +91,9 @@ async def process_note_pipeline(note_id: int):
         note.ocr_metadata = metadata_json
         db.commit()
 
-        # 2. AI Step 0+1: 구조 파악 + 노트 타입 감지
+        # 2. AI 통합 처리 (최적화된 파이프라인)
         note.status = ProcessStatus.AI_ORGANIZING
-        note.progress_message = "[1/3] 필기 구조 분석 중..."
+        note.progress_message = "[1/2] AI 분석 및 정리 중..."
         db.commit()
 
         # 사용자 정보 조회
@@ -111,28 +109,24 @@ async def process_note_pipeline(note_id: int):
                 ai_model = user.get_default_model()
                 debug_log(note_id, f"User: {user.grade_display}, plan={user.plan.value}, ai_mode={user.ai_mode}, model={ai_model.value}")
 
-        # 정리법 템플릿 조회
-        template_prompt = None
-        if note.template_id:
-            template = db.query(OrganizeTemplate).filter(OrganizeTemplate.id == note.template_id).first()
-            if template:
-                template_prompt = template.prompt
-                debug_log(note_id, f"Using template: {template.name} (id={template.id})")
+        # AI 통합 처리 (organize_note 사용)
+        debug_log(note_id, "Starting optimized AI pipeline...")
 
-        # Step 0 + Step 1 실행 (노트 타입 감지)
-        detection_result = await ai_service.detect_note_type_only(
+        result = await ai_service.organize_note(
             ocr_text=ocr_text,
+            method=note.organize_method,
             ocr_metadata=ocr_metadata,
             ai_model=ai_model,
             school_level=school_level,
             grade=grade
         )
 
-        detected_subject_str = detection_result["detected_subject"]
-        detected_note_type_str = detection_result["detected_note_type"]
-        detected_unit = detection_result["detected_unit"]
+        organized_content = result.get("content", "")
+        detected_subject_str = result.get("detected_subject", "other")
+        detected_note_type_str = result.get("detected_note_type", "general")
+        detected_unit = result.get("detected_unit", "")
 
-        debug_log(note_id, f"Detection: subject={detected_subject_str}, type={detected_note_type_str}")
+        debug_log(note_id, f"AI complete: subject={detected_subject_str}, type={detected_note_type_str}")
 
         # 감지 결과 저장
         try:
@@ -145,47 +139,92 @@ async def process_note_pipeline(note_id: int):
         except ValueError:
             note.detected_note_type = NoteType.GENERAL
 
-        # 3. 확인 필요 여부 체크 (V2로 미룸 - 비활성화)
-        # 오답노트로 감지됐는데 사용자가 다른 방식을 선택한 경우
-        # needs_confirmation = (
-        #     detected_note_type_str == "error_note" and
-        #     note.organize_method != OrganizeMethod.ERROR_NOTE
-        # )
-        needs_confirmation = False  # V2까지 비활성화
+        # 제목 생성 및 결과 저장
+        note.title = generate_note_title(detected_subject_str, detected_unit)
+        note.organized_content = organized_content
+        note.status = ProcessStatus.COMPLETED
+        db.commit()
 
-        if needs_confirmation:
-            debug_log(note_id, "Confirmation needed: detected error_note but user selected different method")
+        debug_log(note_id, f"Content saved: {len(organized_content)} chars")
 
-            # 중간 결과 캐시 저장
-            cache_data = {
-                "refined_text": detection_result["refined_text"],
-                "structure": detection_result["structure"],
-                "curriculum_context": detection_result["curriculum_context"],
-                "detected_subject": detected_subject_str,
-                "detected_note_type": detected_note_type_str,
-                "detected_unit": detected_unit
-            }
-            note.detection_cache = json.dumps(cache_data, ensure_ascii=False)
-            note.status = ProcessStatus.CONFIRMATION_NEEDED
-            note.progress_message = "오답노트로 변경할지 확인 필요"
+        # 프로 사용자 + 오답노트인 경우 취약 개념 추출
+        if user and user.plan == UserPlan.PRO and note.organize_method == OrganizeMethod.ERROR_NOTE:
+            try:
+                debug_log(note_id, "Pro user - extracting weak concepts...")
+
+                weak_concepts = await ai_service.extract_weak_concepts(
+                    organized_content=organized_content,
+                    subject=detected_subject_str,
+                    unit=detected_unit
+                )
+
+                for concept_data in weak_concepts:
+                    existing = db.query(UserWeakConcept).filter(
+                        UserWeakConcept.user_id == user.id,
+                        UserWeakConcept.subject == detected_subject_str,
+                        UserWeakConcept.concept == concept_data["concept"]
+                    ).first()
+
+                    if existing:
+                        existing.increment_error(
+                            note_id=note_id,
+                            error_reason=concept_data.get("error_reason")
+                        )
+                    else:
+                        new_concept = UserWeakConcept(
+                            user_id=user.id,
+                            subject=detected_subject_str,
+                            unit=detected_unit,
+                            concept=concept_data["concept"],
+                            error_reason=concept_data.get("error_reason"),
+                            last_note_id=note_id
+                        )
+                        db.add(new_concept)
+
+                db.commit()
+                debug_log(note_id, f"Saved {len(weak_concepts)} weak concepts")
+
+            except Exception as e:
+                debug_log(note_id, f"Weak concept extraction error: {str(e)}")
+
+        # Concept Card 추출
+        try:
+            debug_log(note_id, "Extracting concept cards...")
+
+            concept_cards = await ai_service.extract_concept_cards(
+                organized_content=organized_content,
+                subject=detected_subject_str,
+                unit=detected_unit,
+                note_type=detected_note_type_str
+            )
+
+            for card_data in concept_cards:
+                try:
+                    card_type = CardType(card_data.get("card_type", "concept"))
+                except ValueError:
+                    card_type = CardType.CONCEPT
+
+                new_card = ConceptCard(
+                    note_id=note_id,
+                    user_id=note.user_id,
+                    card_type=card_type,
+                    title=card_data.get("title", ""),
+                    subject=detected_subject_str,
+                    unit_id=detected_unit,
+                    unit_name=detected_unit,
+                    content=card_data.get("content", {}),
+                    common_mistakes=card_data.get("common_mistakes", []),
+                    evidence_spans=card_data.get("evidence_spans", [])
+                )
+                db.add(new_card)
+
             db.commit()
+            debug_log(note_id, f"Saved {len(concept_cards)} concept cards")
 
-            debug_log(note_id, "Paused for user confirmation")
-            return  # 여기서 중단, 사용자 확인 대기
+        except Exception as e:
+            debug_log(note_id, f"Concept card extraction error: {str(e)}")
 
-        # 4. AI Step 2: 콘텐츠 생성 (확인 불필요시 바로 진행)
-        await continue_processing(
-            db, note, user,
-            detection_result["refined_text"],
-            detection_result["structure"],
-            detection_result["curriculum_context"],
-            detected_subject_str,
-            detected_note_type_str,
-            detected_unit,
-            ocr_metadata,
-            ai_model,
-            template_prompt
-        )
+        debug_log(note_id, "Processing completed")
 
     except Exception as e:
         note.status = ProcessStatus.FAILED
