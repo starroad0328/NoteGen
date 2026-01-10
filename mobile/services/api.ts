@@ -5,13 +5,8 @@
 
 import axios from 'axios'
 
-// Railway 클라우드 서버
-const PROD_API_URL = 'https://notegen-production.up.railway.app'
-// 개발 환경: LAN IP (로컬 테스트용)
-const DEV_API_URL = 'http://192.168.55.96:8000'
-
-// 프로덕션 서버 사용 (Railway)
-const API_URL = PROD_API_URL
+// Railway 클라우드 서버 (프로덕션)
+const API_URL = 'https://notegen-production.up.railway.app'
 
 // 외부에서 사용할 수 있도록 export
 export const API_BASE_URL = API_URL
