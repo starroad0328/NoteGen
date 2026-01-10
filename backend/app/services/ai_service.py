@@ -144,10 +144,11 @@ class AIService:
         grade: Optional[int] = None
     ) -> Dict:
         """
-        필기 텍스트를 2단계로 정리 (최적화됨)
+        필기 텍스트를 3단계로 정리
 
         0단계: OCR 정제 (띄어쓰기, 오타)
-        1+2단계 통합: 구조 파악 + 콘텐츠 생성 (1회 API 호출)
+        1단계: 구조 파악 + 과목/타입/단원 감지
+        2단계: 타입별 프롬프트로 정리 생성
 
         Args:
             ocr_text: OCR로 추출한 텍스트
@@ -188,39 +189,11 @@ class AIService:
             # 교육과정 컨텍스트 생성
             curriculum_context = get_curriculum_context(school_level, grade)
 
-            # 오답노트/단어장은 기존 3단계 로직 사용 (특수 프롬프트 필요)
-            if method in [OrganizeMethod.ERROR_NOTE, OrganizeMethod.VOCAB]:
-                return await self._organize_note_legacy(
-                    refined_text, blocks_data, method, ai_model, on_step,
-                    school_level, grade, curriculum_context
-                )
-
-            # 1+2단계 통합: 구조 분석 + 콘텐츠 생성 (최적화)
-            print("[AI] 1+2단계 통합: 분석 및 정리 시작...", flush=True)
-            if on_step:
-                await on_step(1, "필기 분석 및 정리 중...")
-
-            result = await self._step1_analyze_and_organize(
-                blocks_data, refined_text, method, ai_model,
+            # 3단계 로직 사용 (롤백됨)
+            return await self._organize_note_legacy(
+                refined_text, blocks_data, method, ai_model, on_step,
                 school_level, grade, curriculum_context
             )
-
-            detected_subject = result.get("subject", "other")
-            detected_note_type = result.get("note_type", "general")
-            detected_unit = result.get("detected_unit", "")
-            organized = result.get("content", refined_text)
-
-            print(f"[AI] 1+2단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
-
-            # 재처리 제거 - 통합 단계에서 이미 처리됨
-            # 오답노트/단어장도 통합 단계에서 감지 후 적절히 정리됨
-
-            return {
-                "content": organized,
-                "detected_subject": detected_subject,
-                "detected_note_type": detected_note_type,
-                "detected_unit": detected_unit
-            }
 
         except Exception as e:
             print(f"[AI] 에러 발생: {str(e)}", flush=True)
@@ -242,7 +215,7 @@ class AIService:
         특수 프롬프트가 필요한 경우 사용
         """
         # 1단계: 구조 파악
-        print("[AI] Legacy 1단계: 구조 분석...", flush=True)
+        print("[AI] 1단계: 구조 분석...", flush=True)
         if on_step:
             await on_step(1, "필기 구조 분석 중...")
 
@@ -255,10 +228,10 @@ class AIService:
         detected_unit = analysis_result.get("detected_unit", "")
         structure_text = analysis_result.get("structure", "")
 
-        print(f"[AI] Legacy 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
+        print(f"[AI] 1단계 완료. 과목={detected_subject}, 타입={detected_note_type}", flush=True)
 
         # 2단계: 타입별 프롬프트로 정리 생성
-        print("[AI] Legacy 2단계: 콘텐츠 생성...", flush=True)
+        print("[AI] 2단계: 콘텐츠 생성...", flush=True)
         if on_step:
             type_msg = {
                 "error_note": "오답노트 형식으로 정리 중...",
@@ -272,7 +245,7 @@ class AIService:
             detected_subject, detected_note_type
         )
 
-        print(f"[AI] Legacy 2단계 완료. 결과 길이: {len(organized)}", flush=True)
+        print(f"[AI] 2단계 완료. 결과 길이: {len(organized)}", flush=True)
 
         return {
             "content": organized,

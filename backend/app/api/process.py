@@ -54,9 +54,9 @@ def generate_note_title(subject: str, unit: str = "") -> str:
 
 async def process_note_pipeline(note_id: int):
     """
-    노트 처리 파이프라인 (최적화된 2단계)
+    노트 처리 파이프라인 (3단계)
     1. OCR 처리
-    2. AI 통합 처리 (Step 0 + Step 1+2)
+    2. AI 정리 (Step 0: OCR정제 + Step 1: 구조분석 + Step 2: 콘텐츠생성)
     3. 결과 저장
     """
     from app.core.database import SessionLocal
@@ -109,8 +109,8 @@ async def process_note_pipeline(note_id: int):
                 ai_model = user.get_default_model()
                 debug_log(note_id, f"User: {user.grade_display}, plan={user.plan.value}, ai_mode={user.ai_mode}, model={ai_model.value}")
 
-        # AI 통합 처리 (organize_note 사용)
-        debug_log(note_id, "Starting optimized AI pipeline...")
+        # AI 3단계 처리 (organize_note 사용)
+        debug_log(note_id, "Starting AI pipeline (3-step)...")
 
         result = await ai_service.organize_note(
             ocr_text=ocr_text,
